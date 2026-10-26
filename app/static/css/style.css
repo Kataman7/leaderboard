@@ -288,23 +288,16 @@ select:focus,
   border-color: var(--border-focus);
 }
 
-/* Horizontal Game Chips Filter */
+/* Game Chips Filter (wraps cleanly when space is tight) */
 .game-chips-carousel {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
-  padding: 2px 2px 10px 2px;
+  padding: 2px 0 10px 0;
   margin-bottom: 12px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.game-chips-carousel::-webkit-scrollbar {
-  display: none;
 }
 
 .game-filter-chip {
-  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;

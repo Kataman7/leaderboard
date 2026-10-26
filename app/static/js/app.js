@@ -271,7 +271,7 @@ function setLeaderboardSort(mode) {
 
   const subtitle = document.getElementById('lbSubtitle');
   if (subtitle) {
-    subtitle.textContent = mode === 'ratio' ? 'Basé sur le ratio de victoires' : 'Basé sur le nombre de victoires';
+    subtitle.textContent = mode === 'ratio' ? 'Basé sur le ratio' : 'Basé sur les wins';
   }
 
   renderLeaderboard();
@@ -314,17 +314,17 @@ function renderLeaderboard() {
 
   // Helper for podium metrics
   const formatPodiumMetric = (p) => {
-    const wonPlural = p.matches_won > 1 ? 'victoires' : 'victoire';
-    const playedPlural = p.matches_played > 1 ? 'parties' : 'partie';
+    const winsLabel = p.matches_won > 1 ? 'wins' : 'win';
+    const gamesLabel = p.matches_played > 1 ? 'games' : 'game';
     if (sortByWins) {
       return `
-        <div class="podium-ratio">${p.matches_won} ${wonPlural}</div>
-        <div class="podium-sub">${(p.win_ratio * 100).toFixed(0)}% • ${p.matches_played} ${playedPlural}</div>
+        <div class="podium-ratio">${p.matches_won} ${winsLabel}</div>
+        <div class="podium-sub">${(p.win_ratio * 100).toFixed(0)}% • ${p.matches_played} ${gamesLabel}</div>
       `;
     } else {
       return `
         <div class="podium-ratio">${(p.win_ratio * 100).toFixed(0)}%</div>
-        <div class="podium-sub">${p.matches_won} ${wonPlural} • ${p.matches_played} ${playedPlural}</div>
+        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${p.matches_played} ${gamesLabel}</div>
       `;
     }
   };
@@ -420,14 +420,14 @@ function renderLeaderboard() {
       rankBadgeHtml = `<div class="lb-rank">#${entry.rank}</div>`;
     }
 
-    const wonPlural = entry.matches_won > 1 ? 'victoires' : 'victoire';
-    const playedPlural = entry.matches_played > 1 ? 'parties' : 'partie';
+    const winsLabel = entry.matches_won > 1 ? 'wins' : 'win';
+    const gamesLabel = entry.matches_played > 1 ? 'games' : 'game';
 
     let cardRightHtml = '';
     if (sortByWins) {
       cardRightHtml = `
         <div class="lb-ratio">${entry.matches_won}</div>
-        <div class="lb-ratio-label">${wonPlural}</div>
+        <div class="lb-ratio-label">${winsLabel}</div>
       `;
     } else {
       cardRightHtml = `
@@ -446,7 +446,7 @@ function renderLeaderboard() {
           <div>
             <div class="lb-player-name">${escapeHtml(entry.player_name)}</div>
             <div class="lb-player-sub">
-              ${entry.matches_won} ${wonPlural} • ${entry.matches_played} ${playedPlural}
+              ${entry.matches_won} ${winsLabel} • ${entry.matches_played} ${gamesLabel}
             </div>
           </div>
         </div>
