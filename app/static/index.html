@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BoardScores - Suivi de scores de jeux de société</title>
+
+  <!-- PWA meta tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="BoardScores">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
+
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Toast notification banner -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Main Content Views -->
+  <main class="main-content">
+
+    <!-- ================= VIEW 1: CLASSEMENT ================= -->
+    <section id="viewLeaderboard" class="view-section active">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Classement</h1>
+          <p class="section-subtitle" id="lbSubtitle">Basé sur le ratio de victoires</p>
+        </div>
+        <div class="lb-sort-toggle" role="group" aria-label="Trier le classement">
+          <button type="button" class="lb-sort-btn active" id="btnSortRatio" onclick="setLeaderboardSort('ratio')">Ratio</button>
+          <button type="button" class="lb-sort-btn" id="btnSortWins" onclick="setLeaderboardSort('wins')">Victoires</button>
+        </div>
+      </div>
+
+      <!-- Visual Games Carousel Filter -->
+      <div id="lbGameCarousel" class="game-chips-carousel">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Top 3 Podium -->
+      <div id="podiumContainer" class="podium-container" style="display: none;"></div>
+
+      <!-- Leaderboard List -->
+      <div id="leaderboardList" class="leaderboard-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ================= VIEW 2: HISTORIQUE ================= -->
+    <section id="viewHistory" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Historique global</h1>
+          <p class="section-subtitle">Chaque action est enregistrée et réversible</p>
+        </div>
+      </div>
+
+      <!-- History Filters: Type & Date -->
+      <div class="history-controls">
+        <div class="history-type-chips">
+          <button type="button" class="history-chip active" onclick="setHistoryTypeFilter('ALL', this)">Tous</button>
+          <button type="button" class="history-chip" onclick="setHistoryTypeFilter('RECORD_MATCH', this)">Parties</button>
+          <button type="button" class="history-chip" onclick="setHistoryTypeFilter('CREATE_GAME', this)">Jeux</button>
+          <button type="button" class="history-chip" onclick="setHistoryTypeFilter('CREATE_PLAYER', this)">Joueurs</button>
+          <button type="button" class="history-chip" onclick="setHistoryTypeFilter('UNDO_ACTION', this)">Annulations</button>
+        </div>
+
+        <div class="history-date-bar">
+          <input type="date" id="historyDateInput" class="custom-input history-date-input" onchange="onHistoryDateChange(this.value)" title="Filtrer par date">
+          <button type="button" id="btnClearHistoryDate" class="btn btn-sm btn-secondary" onclick="clearHistoryDateFilter()" style="display: none;">Effacer date</button>
+        </div>
+      </div>
+
+      <!-- History List -->
+      <div id="historyList" class="history-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ================= VIEW 3: JEUX ================= -->
+    <section id="viewGames" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Jeux de société</h1>
+          <p class="section-subtitle">Bibliothèque de jeux enregistrés</p>
+        </div>
+        <button id="btnToggleAddGame" class="btn btn-sm btn-primary" onclick="toggleInlineAddGame()">+ Nouveau jeu</button>
+      </div>
+
+      <!-- Integrated inline game creation panel -->
+      <div id="inlineAddGamePanel" class="inline-card-form" style="display: none;">
+        <div class="inline-card-header">
+          <span class="inline-card-title">Ajouter un jeu</span>
+          <button type="button" class="btn-icon-subtle" onclick="toggleInlineAddGame(false)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <form id="formInlineGame" onsubmit="submitInlineGame(event, 'gamesView')">
+          <div class="form-group">
+            <label class="form-label" for="inlineGameName_gamesView">Nom du jeu</label>
+            <div class="input-autocomplete-wrap">
+              <input type="text" id="inlineGameName_gamesView" class="custom-input" placeholder="Ex: Catan, 7 Wonders, Skyjo..." required autocomplete="off" oninput="onGameInputTyping(this.value, 'gamesView')">
+              <div id="gameSuggestions_gamesView" class="autocomplete-suggestions"></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Image de la boîte</label>
+            <div class="segmented-control" style="margin-bottom: 8px;">
+              <button type="button" id="tabImgUpload_gamesView" class="seg-btn active" onclick="switchImgInputMode('upload', 'gamesView')">Fichier</button>
+              <button type="button" id="tabImgUrl_gamesView" class="seg-btn" onclick="switchImgInputMode('url', 'gamesView')">Lien URL</button>
+            </div>
+
+            <div id="imgUploadContainer_gamesView">
+              <input type="file" id="inlineGameFile_gamesView" accept="image/*" class="custom-input" onchange="previewGameUpload(this, 'gamesView')">
+            </div>
+            <div id="imgUrlContainer_gamesView" style="display: none;">
+              <input type="url" id="inlineGameImageUrl_gamesView" class="custom-input" placeholder="https://exemple.com/image.jpg" oninput="previewGameUrl(this.value, 'gamesView')">
+            </div>
+            <div id="gamePreviewWrap_gamesView" style="margin-top: 8px; display: none; text-align: center;">
+              <img id="gamePreviewImg_gamesView" src="" alt="Aperçu" style="max-height: 90px; border-radius: 6px; border: 1px solid var(--border);">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <button type="submit" class="btn btn-primary" style="flex:1;">Enregistrer le jeu</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleInlineAddGame(false)">Annuler</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="gamesGrid" class="games-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ================= VIEW 4: JOUEURS ================= -->
+    <section id="viewPlayers" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Joueurs</h1>
+          <p class="section-subtitle">Profils et pseudos de la communauté</p>
+        </div>
+      </div>
+
+      <!-- Integrated inline player creation & search bar -->
+      <div class="inline-creation-box">
+        <div class="input-autocomplete-wrap" style="flex: 1;">
+          <input type="text" id="inlinePlayerInput" class="custom-input" placeholder="Ajouter ou chercher un joueur..." autocomplete="off" oninput="onPlayerInputTyping(this.value, 'playersView')" onkeydown="if(event.key==='Enter'){event.preventDefault();submitInlinePlayer('playersView');}">
+          <div id="playerSuggestions_playersView" class="autocomplete-suggestions"></div>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="submitInlinePlayer('playersView')">+ Ajouter</button>
+      </div>
+
+      <div id="playersList" class="players-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ================= VIEW 5: STEP-BY-STEP MATCH WIZARD ================= -->
+    <section id="viewAddMatch" class="view-section">
+      <!-- Stepper Navigation Header -->
+      <div class="stepper-header">
+        <button type="button" class="btn-step-nav" onclick="wizardBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          <span id="wizardBackText">Retour</span>
+        </button>
+
+        <div class="stepper-progress">
+          <div class="step-dot active" id="dotStep1">1</div>
+          <div class="step-line" id="lineStep1"></div>
+          <div class="step-dot" id="dotStep2">2</div>
+          <div class="step-line" id="lineStep2"></div>
+          <div class="step-dot" id="dotStep3">3</div>
+          <div class="step-line" id="lineStep3"></div>
+          <div class="step-dot" id="dotStep4">4</div>
+        </div>
+
+        <div class="step-counter" id="stepCounterLabel">Étape 1/4</div>
+      </div>
+
+      <!-- STEP 1: Choisir le jeu -->
+      <div class="wizard-step active" id="wizardStep1">
+        <div class="step-intro">
+          <h2 class="step-title">Quel jeu avez-vous joué ?</h2>
+          <p class="step-subtitle">Touchez un jeu existant ou ajoutez-en un nouveau</p>
+        </div>
+
+        <!-- Integrated inline add game inside wizard -->
+        <div id="wizardAddGamePanel" class="inline-card-form" style="display: none; margin-bottom: 16px;">
+          <div class="inline-card-header">
+            <span class="inline-card-title">Nouveau jeu</span>
+            <button type="button" class="btn-icon-subtle" onclick="toggleWizardAddGame(false)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <form id="formWizardGame" onsubmit="submitInlineGame(event, 'wizard')">
+            <div class="form-group">
+              <label class="form-label" for="inlineGameName_wizard">Nom du jeu</label>
+              <div class="input-autocomplete-wrap">
+                <input type="text" id="inlineGameName_wizard" class="custom-input" placeholder="Ex: Catan, Skyjo..." required autocomplete="off" oninput="onGameInputTyping(this.value, 'wizard')">
+                <div id="gameSuggestions_wizard" class="autocomplete-suggestions"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Image de la boîte</label>
+              <div class="segmented-control" style="margin-bottom: 8px;">
+                <button type="button" id="tabImgUpload_wizard" class="seg-btn active" onclick="switchImgInputMode('upload', 'wizard')">Fichier</button>
+                <button type="button" id="tabImgUrl_wizard" class="seg-btn" onclick="switchImgInputMode('url', 'wizard')">Lien URL</button>
+              </div>
+
+              <div id="imgUploadContainer_wizard">
+                <input type="file" id="inlineGameFile_wizard" accept="image/*" class="custom-input" onchange="previewGameUpload(this, 'wizard')">
+              </div>
+              <div id="imgUrlContainer_wizard" style="display: none;">
+                <input type="url" id="inlineGameImageUrl_wizard" class="custom-input" placeholder="https://..." oninput="previewGameUrl(this.value, 'wizard')">
+              </div>
+              <div id="gamePreviewWrap_wizard" style="margin-top: 8px; display: none; text-align: center;">
+                <img id="gamePreviewImg_wizard" src="" alt="Aperçu" style="max-height: 90px; border-radius: 6px; border: 1px solid var(--border);">
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px;">
+              <button type="submit" class="btn btn-vibrant" style="flex:1;">Créer et continuer</button>
+              <button type="button" class="btn btn-secondary" onclick="toggleWizardAddGame(false)">Annuler</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="wizardGameGrid" class="wizard-games-grid">
+          <!-- Rendered dynamically: Game cards + Add Game Card -->
+        </div>
+      </div>
+
+      <!-- STEP 2: Sélectionner les participants -->
+      <div class="wizard-step" id="wizardStep2">
+        <div class="step-intro">
+          <h2 class="step-title">Qui a participé ?</h2>
+          <p class="step-subtitle">Touchez les joueurs pour les sélectionner</p>
+        </div>
+
+        <!-- Quick inline add player bar with autocomplete -->
+        <div class="quick-add-player-box">
+          <div class="input-autocomplete-wrap" style="flex: 1;">
+            <input type="text" id="quickWizardPlayerInput" class="custom-input" placeholder="Ajouter ou chercher un joueur..." autocomplete="off" oninput="onPlayerInputTyping(this.value, 'wizard')" onkeydown="if(event.key==='Enter'){event.preventDefault();submitInlinePlayer('wizard');}">
+            <div id="playerSuggestions_wizard" class="autocomplete-suggestions"></div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" onclick="submitInlinePlayer('wizard')">+ Ajouter</button>
+        </div>
+
+        <div id="wizardPlayerGrid" class="wizard-players-grid">
+          <!-- Rendered dynamically: Player cards with checkmark toggles -->
+        </div>
+
+        <div class="wizard-bottom-actions">
+          <button type="button" id="btnStep2Next" class="btn btn-vibrant btn-block" onclick="goToWizardStep(3)" disabled>
+            <span id="btnStep2NextLabel">Continuer avec <span id="selectedPlayersCount">0</span> joueur</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Résultat de la partie (Gagné ou Perdu) -->
+      <div class="wizard-step" id="wizardStep3">
+        <div class="step-intro">
+          <h2 class="step-title">Résultat de la partie</h2>
+          <p class="step-subtitle">Indiquez pour chaque joueur s'il a gagné ou perdu</p>
+        </div>
+
+        <div id="wizardScoresList" class="wizard-scores-list">
+          <!-- Rendered dynamically: Gagné / Perdu toggles -->
+        </div>
+
+        <div class="wizard-bottom-actions">
+          <button type="button" class="btn btn-vibrant btn-block" onclick="goToWizardStep(4)">
+            <span>Vérifier le récapitulatif</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 4: Date, Notes & Validation -->
+      <div class="wizard-step" id="wizardStep4">
+        <div class="step-intro">
+          <h2 class="step-title">Récapitulatif de la partie</h2>
+          <p class="step-subtitle">Vérifiez les données avant d'enregistrer</p>
+        </div>
+
+        <!-- Dynamic summary card -->
+        <div id="wizardSummaryCard" class="recap-card"></div>
+
+        <div class="form-group" style="margin-top: 18px;">
+          <label class="form-label" for="wizardPlayedAt">Date et heure de la partie</label>
+          <input type="datetime-local" id="wizardPlayedAt" class="custom-input" required>
+        </div>
+
+        <div class="wizard-bottom-actions">
+          <button type="button" class="btn btn-vibrant btn-block btn-lg" onclick="submitWizardMatch()">
+            Enregistrer la partie
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= BOTTOM NAVIGATION BAR ================= -->
+  <nav class="bottom-nav">
+    <!-- Tab 1: Classement -->
+    <button class="nav-item active" onclick="switchView('leaderboard')" id="navLeaderboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+        <path d="M4 22h16"/>
+        <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+        <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+        <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+      </svg>
+      <span class="nav-label">Classement</span>
+    </button>
+
+    <!-- Tab 2: Jeux (dé à 4 points sans point central) -->
+    <button class="nav-item" onclick="switchView('games')" id="navGames">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="18" height="18" x="3" y="3" rx="4"/>
+        <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+        <circle cx="16" cy="8" r="1.5" fill="currentColor"/>
+        <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+        <circle cx="16" cy="16" r="1.5" fill="currentColor"/>
+      </svg>
+      <span class="nav-label">Jeux</span>
+    </button>
+
+    <!-- Center Big Button: Ajouter un score (Switch to dedicated Add Match page) -->
+    <div class="nav-center-item">
+      <button id="btnCenterAddScore" class="btn-add-score-main" onclick="switchView('addMatch')" title="Ajouter une partie" aria-label="Ajouter une partie">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Tab 3: Joueurs -->
+    <button class="nav-item" onclick="switchView('players')" id="navPlayers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <span class="nav-label">Joueurs</span>
+    </button>
+
+    <!-- Tab 4: Historique (en dernier) -->
+    <button class="nav-item" onclick="switchView('history')" id="navHistory">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+        <path d="M12 7v5l4 2"/>
+      </svg>
+      <span class="nav-label">Historique</span>
+    </button>
+  </nav>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

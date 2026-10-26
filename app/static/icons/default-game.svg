@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="32" fill="#1e293b" />
+  <!-- Meeple figure -->
+  <g fill="#6366f1">
+    <circle cx="100" cy="65" r="24" />
+    <path d="M70 160 L85 105 L60 120 L50 100 L85 85 L115 85 L150 100 L140 120 L115 105 L130 160 Z" />
+  </g>
+</svg>

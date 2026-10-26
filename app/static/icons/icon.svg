@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <!-- Board game meeple / crown / dice graphic -->
+  <g transform="translate(136, 110)">
+    <!-- Trophy cup -->
+    <path d="M40 40 L200 40 C200 120 160 170 120 190 L120 230 L160 250 L160 270 L80 270 L80 250 L120 230 L120 190 C80 170 40 120 40 40 Z" fill="url(#gold)" />
+    <!-- Handles -->
+    <path d="M40 60 C10 60 0 95 10 125 C20 150 45 155 55 155" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round" />
+    <path d="M200 60 C230 60 240 95 230 125 C220 150 195 155 185 155" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round" />
+    <!-- Star on trophy -->
+    <polygon points="120,70 127,92 150,92 131,106 138,128 120,114 102,128 109,106 90,92 113,92" fill="#ffffff" opacity="0.9" />
+  </g>
+
+  <!-- Two dice dots / accents -->
+  <rect x="70" y="360" width="70" height="70" rx="18" fill="url(#accent)" transform="rotate(-12 105 395)" />
+  <circle cx="100" cy="390" r="7" fill="#ffffff" />
+  <circle cx="85" cy="405" r="7" fill="#ffffff" />
+  <circle cx="115" cy="375" r="7" fill="#ffffff" />
+
+  <rect x="360" y="350" width="70" height="70" rx="18" fill="url(#accent)" transform="rotate(15 395 385)" />
+  <circle cx="395" cy="385" r="7" fill="#ffffff" />
+  <circle cx="380" cy="370" r="7" fill="#ffffff" />
+  <circle cx="410" cy="400" r="7" fill="#ffffff" />
+  <circle cx="380" cy="400" r="7" fill="#ffffff" />
+  <circle cx="410" cy="370" r="7" fill="#ffffff" />
+</svg>
