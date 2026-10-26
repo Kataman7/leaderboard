@@ -60,6 +60,8 @@ const state = {
 // DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initServiceWorker();
+  checkMobileInstallBanner();
+  window.addEventListener('resize', checkMobileInstallBanner);
   setupInitialDateTime();
   loadAllData();
 });
@@ -78,11 +80,11 @@ function initServiceWorker() {
     });
   }
 
-  // Handle Chrome / Android PWA installation prompt
+  // Handle Chrome / Android PWA installation prompt if fired
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
-    showPwaInstallBanner();
+    checkMobileInstallBanner();
   });
 
   // Handle app installed
@@ -91,16 +93,31 @@ function initServiceWorker() {
     dismissPwaBanner();
     showToast('Application installée sur votre appareil !', 'success');
   });
-
-  // Check iOS Safari install hint
-  checkIosInstallPrompt();
 }
 
-function showPwaInstallBanner() {
+function checkMobileInstallBanner() {
+  // If already installed and running standalone, do not show
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  if (isStandalone) {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+
+  // Check if screen represents mobile size (<= 768px)
+  const isMobileSize = window.innerWidth <= 768 || window.matchMedia('(max-width: 768px)').matches;
+  if (!isMobileSize) {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+
+  // Check if user dismissed recently (in last 12h)
   const dismissedTime = localStorage.getItem('pwa_dismissed_at');
   if (dismissedTime && Date.now() - parseInt(dismissedTime, 10) < 43200000) {
     return;
   }
+
   const banner = document.getElementById('pwaInstallBanner');
   if (banner) {
     banner.style.display = 'flex';
@@ -116,6 +133,7 @@ function dismissPwaBanner() {
 }
 
 async function triggerPwaInstall() {
+  // 1. If native browser installation prompt is available
   if (deferredInstallPrompt) {
     deferredInstallPrompt.prompt();
     const { outcome } = await deferredInstallPrompt.userChoice;
@@ -123,29 +141,25 @@ async function triggerPwaInstall() {
       dismissPwaBanner();
     }
     deferredInstallPrompt = null;
+    return;
   }
-}
 
-function checkIosInstallPrompt() {
+  // 2. If native prompt is not exposed (e.g. testing via local HTTP or iOS Safari)
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-  if (isIos && !isStandalone) {
-    const dismissedTime = localStorage.getItem('pwa_dismissed_at');
-    if (dismissedTime && Date.now() - parseInt(dismissedTime, 10) < 43200000) {
-      return;
-    }
-    const banner = document.getElementById('pwaInstallBanner');
-    const sub = banner ? banner.querySelector('.pwa-install-subtitle') : null;
-    const btn = document.getElementById('btnPwaInstall');
-    if (sub) {
-      sub.textContent = "Partager ⎋ puis 'Sur l'écran d'accueil'";
-    }
+  const sub = document.querySelector('#pwaInstallBanner .pwa-install-subtitle');
+  const btn = document.getElementById('btnPwaInstall');
+
+  if (isIos) {
+    if (sub) sub.innerHTML = "Sur iPhone : appuyez sur <strong>Partager ⎋</strong> puis <strong>'Sur l'écran d'accueil' ⊞</strong>";
+    if (btn) btn.style.display = 'none';
+    showToast("Sur iPhone : appuyez sur Partager ⎋ puis 'Sur l'écran d'accueil'", 'info', 6000);
+  } else {
+    if (sub) sub.innerHTML = "Dans Chrome : appuyez sur <strong>⋮ (3 points)</strong> > <strong>'Installer l'application'</strong>";
     if (btn) {
-      btn.style.display = 'none';
+      btn.textContent = 'Compris';
+      btn.onclick = () => dismissPwaBanner();
     }
-    if (banner) {
-      banner.style.display = 'flex';
-    }
+    showToast("Dans Chrome : appuyez sur ⋮ en haut à droite puis 'Installer l'application'", 'info', 6000);
   }
 }
 
@@ -1389,7 +1403,7 @@ function setupInitialDateTime() {
   }
 }
 
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 3200) {
   const container = document.getElementById('toastContainer');
   if (!container) return;
 
@@ -1413,7 +1427,7 @@ function showToast(message, type = 'info') {
     toast.style.transform = 'translateY(-10px)';
     toast.style.transition = 'all 0.25s ease';
     setTimeout(() => toast.remove(), 250);
-  }, 3200);
+  }, duration);
 }
 
 function escapeHtml(str) {
