@@ -95,32 +95,37 @@ function initServiceWorker() {
   });
 }
 
+function isPwaStandalone() {
+  if (window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches) {
+    return true;
+  }
+  if (window.navigator.standalone === true) {
+    return true;
+  }
+  if (document.referrer && document.referrer.startsWith('android-app://')) {
+    return true;
+  }
+  return false;
+}
+
 function checkMobileInstallBanner() {
-  // If already installed and running standalone, do not show
-  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-  if (isStandalone) {
-    const banner = document.getElementById('pwaInstallBanner');
-    if (banner) banner.style.display = 'none';
-    return;
-  }
-
-  // Check if screen represents mobile size (<= 768px)
-  const isMobileSize = window.innerWidth <= 768 || window.matchMedia('(max-width: 768px)').matches;
-  if (!isMobileSize) {
-    const banner = document.getElementById('pwaInstallBanner');
-    if (banner) banner.style.display = 'none';
-    return;
-  }
-
-  // Check if user dismissed recently (in last 12h)
-  const dismissedTime = localStorage.getItem('pwa_dismissed_at');
-  if (dismissedTime && Date.now() - parseInt(dismissedTime, 10) < 43200000) {
-    return;
-  }
-
   const banner = document.getElementById('pwaInstallBanner');
-  if (banner) {
+  if (!banner) return;
+
+  // Once installed and running inside the PWA app: NEVER show the banner
+  if (isPwaStandalone()) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  // Always show on mobile screen width (<= 768px) upon each refresh
+  const isMobileSize = window.innerWidth <= 768 || window.matchMedia('(max-width: 768px)').matches;
+  if (isMobileSize) {
     banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
   }
 }
 
@@ -129,7 +134,6 @@ function dismissPwaBanner() {
   if (banner) {
     banner.style.display = 'none';
   }
-  localStorage.setItem('pwa_dismissed_at', Date.now().toString());
 }
 
 async function triggerPwaInstall() {

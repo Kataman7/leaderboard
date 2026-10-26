@@ -1646,3 +1646,11 @@ select:focus,
   font-weight: 700;
   min-height: 32px;
 }
+
+/* Never display install banner if already running in standalone PWA app */
+@media all and (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  #pwaInstallBanner,
+  .pwa-install-banner {
+    display: none !important;
+  }
+}
