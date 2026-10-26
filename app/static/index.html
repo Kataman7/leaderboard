@@ -22,6 +22,21 @@
   <!-- Toast notification banner -->
   <div id="toastContainer" class="toast-container"></div>
 
+  <!-- PWA Install Banner -->
+  <div id="pwaInstallBanner" class="pwa-install-banner" style="display: none;">
+    <div class="pwa-install-content">
+      <span class="pwa-install-emoji">🎲</span>
+      <div class="pwa-install-text">
+        <div class="pwa-install-title">Installer BoardScores</div>
+        <div class="pwa-install-subtitle">Ajouter à l'écran d'accueil</div>
+      </div>
+    </div>
+    <div class="pwa-install-actions">
+      <button type="button" class="btn btn-sm btn-vibrant" id="btnPwaInstall" onclick="triggerPwaInstall()">Installer</button>
+      <button type="button" class="btn btn-sm btn-secondary pwa-close-btn" onclick="dismissPwaBanner()" aria-label="Fermer">✕</button>
+    </div>
+  </div>
+
   <!-- Main Content Views -->
   <main class="main-content">
 

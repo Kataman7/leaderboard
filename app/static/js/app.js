@@ -67,6 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 // PWA & SERVICE WORKER
 // ==========================================
+let deferredInstallPrompt = null;
+
 function initServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -74,6 +76,76 @@ function initServiceWorker() {
         .then((reg) => console.log('Service Worker enregistré :', reg.scope))
         .catch((err) => console.warn('Service Worker échec :', err));
     });
+  }
+
+  // Handle Chrome / Android PWA installation prompt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    showPwaInstallBanner();
+  });
+
+  // Handle app installed
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    dismissPwaBanner();
+    showToast('Application installée sur votre appareil !', 'success');
+  });
+
+  // Check iOS Safari install hint
+  checkIosInstallPrompt();
+}
+
+function showPwaInstallBanner() {
+  const dismissedTime = localStorage.getItem('pwa_dismissed_at');
+  if (dismissedTime && Date.now() - parseInt(dismissedTime, 10) < 43200000) {
+    return;
+  }
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) {
+    banner.style.display = 'flex';
+  }
+}
+
+function dismissPwaBanner() {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) {
+    banner.style.display = 'none';
+  }
+  localStorage.setItem('pwa_dismissed_at', Date.now().toString());
+}
+
+async function triggerPwaInstall() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+      dismissPwaBanner();
+    }
+    deferredInstallPrompt = null;
+  }
+}
+
+function checkIosInstallPrompt() {
+  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  if (isIos && !isStandalone) {
+    const dismissedTime = localStorage.getItem('pwa_dismissed_at');
+    if (dismissedTime && Date.now() - parseInt(dismissedTime, 10) < 43200000) {
+      return;
+    }
+    const banner = document.getElementById('pwaInstallBanner');
+    const sub = banner ? banner.querySelector('.pwa-install-subtitle') : null;
+    const btn = document.getElementById('btnPwaInstall');
+    if (sub) {
+      sub.textContent = "Partager ⎋ puis 'Sur l'écran d'accueil'";
+    }
+    if (btn) {
+      btn.style.display = 'none';
+    }
+    if (banner) {
+      banner.style.display = 'flex';
+    }
   }
 }
 
