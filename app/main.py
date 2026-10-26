@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Board Game Leaderboard & Score Tracker",
+    title="Leaderboard",
     description="Application PWA pour suivre les scores de jeux de société avec historique append-only et annulation réversible.",
     version="1.0.0",
     lifespan=lifespan,

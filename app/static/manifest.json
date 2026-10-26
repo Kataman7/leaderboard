@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "BoardScores - Suivi de jeux de société",
-  "short_name": "BoardScores",
-  "description": "Suivi des scores et classements de jeux de société avec historique traçable et réversible.",
+  "name": "Leaderboard",
+  "short_name": "Leaderboard",
+  "description": "Classements et suivi des scores de jeux de société.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

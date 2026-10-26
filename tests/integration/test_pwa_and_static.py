@@ -6,7 +6,7 @@ def test_manifest_endpoint(client):
     res = client.get("/manifest.json")
     assert res.status_code == 200
     data = res.json()
-    assert data["name"] == "BoardScores - Suivi de jeux de société"
+    assert data["name"] == "Leaderboard"
     assert data["display"] == "standalone"
     assert len(data["icons"]) >= 2
 
@@ -23,7 +23,7 @@ def test_index_page(client):
     res = client.get("/")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]
-    assert "BoardScores" in res.text
+    assert "Leaderboard" in res.text
     assert "manifest.json" in res.text
 
 
