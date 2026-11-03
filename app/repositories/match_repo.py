@@ -1,4 +1,5 @@
 """Match repository for SQLite."""
+import collections
 import sqlite3
 import uuid
 from typing import List, Optional
@@ -98,11 +99,38 @@ class MatchRepository:
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
 
-        result = []
-        for row in rows:
-            scores = self._get_match_scores(row["id"])
-            result.append(self._row_to_match(row, scores))
-        return result
+        if not rows:
+            return []
+
+        match_ids = [r["id"] for r in rows]
+        # Batch-fetch all scores for returned matches in 1 query (eliminates N+1 query issue)
+        placeholders = ",".join("?" for _ in match_ids)
+        score_cursor = self.conn.cursor()
+        score_cursor.execute(
+            f"""
+            SELECT ms.match_id, ms.player_id, p.name AS player_name, ms.score, ms.is_winner
+            FROM match_scores ms
+            JOIN players p ON ms.player_id = p.id
+            WHERE ms.match_id IN ({placeholders})
+            ORDER BY ms.score DESC, ms.is_winner DESC
+            """,
+            tuple(match_ids),
+        )
+        scores_by_match = collections.defaultdict(list)
+        for r in score_cursor.fetchall():
+            scores_by_match[r["match_id"]].append(
+                MatchScore(
+                    player_id=r["player_id"],
+                    player_name=r["player_name"],
+                    score=r["score"],
+                    is_winner=bool(r["is_winner"]),
+                )
+            )
+
+        return [
+            self._row_to_match(row, scores_by_match.get(row["id"], []))
+            for row in rows
+        ]
 
     def set_match_active_status(self, match_id: str, is_active: bool) -> None:
         with self.conn:

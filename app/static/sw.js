@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boardscores-v5';
+const CACHE_NAME = 'boardscores-v26';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -10,22 +10,22 @@ const STATIC_ASSETS = [
   '/static/icons/default-game.svg'
 ];
 
-// Install: cache core shell assets
+// Install: pre-cache assets and immediately skip waiting to activate
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
 });
 
-// Activate: cleanup old caches
+// Activate: clean up ALL old caches and take control of all clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[SW] Suppression ancien cache:', key);
             return caches.delete(key);
           }
         })
@@ -34,46 +34,44 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: network-first for API, cache-first for static assets
+// Allow client pages to trigger immediate skipWaiting
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Fetch: NETWORK FIRST for everything, fallback to cache
+// This ensures that updates are always delivered immediately without hard refresh!
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
 
-  // For API calls, use Network First, fallback to cache
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // If valid response, clone and cache for offline reading
-          if (response && response.status === 200 && event.request.method === 'GET') {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // For static assets, Cache First with network fallback
+  // Network First with Cache Fallback strategy
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch in background to update cache
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-          }
-        }).catch(() => {/* ignore network failure */});
-        return cachedResponse;
-      }
-      return fetch(event.request).then((response) => {
-        if (response && response.status === 200 && event.request.method === 'GET') {
-          const responseClone = response.clone();
+    fetch(event.request)
+      .then((networkResponse) => {
+        // If successful, update the cache in the background
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         }
-        return response;
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        // Network failed (offline) -> serve from cache
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // If page navigation failed and not in cache, fallback to root
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+          return new Response('Mode hors-ligne', { status: 503, statusText: 'Offline' });
+        });
+      })
   );
 });

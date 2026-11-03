@@ -64,3 +64,48 @@ class GameService:
 
     def list_games(self, include_inactive: bool = False) -> List[Game]:
         return self.game_repo.list_games(include_inactive=include_inactive)
+
+    def update_game_name(self, game_id: str, new_name: str) -> Game:
+        game = self.game_repo.get_game(game_id)
+        if not game:
+            raise ValueError("Jeu introuvable.")
+        new_name = new_name.strip()
+        if not new_name:
+            raise ValueError("Le nom du jeu ne peut pas être vide.")
+
+        existing = self.game_repo.get_game_by_name(new_name)
+        if existing and existing.id != game_id:
+            raise ValueError(f"Le jeu '{new_name}' existe déjà.")
+
+        old_name = game.name
+        self.game_repo.update_game_name(game_id, new_name)
+        game.name = new_name
+
+        self.history_service.record_action(
+            action_type=ActionType.UPDATE_GAME,
+            entity_type=EntityType.GAME,
+            entity_id=game_id,
+            summary=f"Jeu renommé : {old_name} -> {new_name}",
+            details={"game_id": game_id, "old_name": old_name, "new_name": new_name},
+        )
+        return game
+
+    def update_game_image(self, game_id: str, image_url: str) -> Game:
+        game = self.game_repo.get_game(game_id)
+        if not game:
+            raise ValueError("Jeu introuvable.")
+        image_url = (image_url or "").strip()
+        if not image_url:
+            raise ValueError("L'URL de l'image ne peut pas être vide.")
+
+        self.game_repo.update_game_image(game_id, image_url)
+        game.image_url = image_url
+
+        self.history_service.record_action(
+            action_type=ActionType.UPDATE_GAME,
+            entity_type=EntityType.GAME,
+            entity_id=game_id,
+            summary=f"Image modifiée pour le jeu '{game.name}'",
+            details={"game_id": game_id, "image_url": image_url},
+        )
+        return game

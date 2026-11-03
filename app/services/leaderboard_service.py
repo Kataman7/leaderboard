@@ -11,17 +11,50 @@ class LeaderboardService:
         self.match_repo = match_repo
         self.player_repo = player_repo
 
-    def _get_active_player_ids(self) -> Optional[Set[str]]:
+    def _get_active_players_info(self):
+        active_ids = None
+        images = {}
         if self.player_repo:
-            return {p.id for p in self.player_repo.list_players(include_inactive=False)}
-        return None
+            players = self.player_repo.list_players(include_inactive=False)
+            active_ids = {p.id for p in players}
+            images = {p.id: p.image_url for p in players}
+        return active_ids, images
 
-    def get_global_leaderboard(self) -> List[PlayerLeaderboardEntry]:
+    def get_leaderboard(
+        self,
+        game_id: Optional[str] = None,
+        with_player_id: Optional[str] = None,
+        match_ids: Optional[Set[str]] = None,
+    ) -> List[PlayerLeaderboardEntry]:
+        """Calculates leaderboard rankings based on active matches with optional filters."""
+        matches = self.match_repo.list_matches(
+            game_id=game_id,
+            include_inactive=False,
+            limit=10000,
+        )
+        active_ids, images = self._get_active_players_info()
+        return calculate_leaderboard(
+            matches,
+            game_id=game_id,
+            with_player_id=with_player_id,
+            match_ids=match_ids,
+            active_player_ids=active_ids,
+            player_images=images,
+        )
+
+    def get_global_leaderboard(
+        self,
+        with_player_id: Optional[str] = None,
+        match_ids: Optional[Set[str]] = None,
+    ) -> List[PlayerLeaderboardEntry]:
         """Calculates global leaderboard across all active matches for active players."""
-        matches = self.match_repo.list_matches(include_inactive=False, limit=10000)
-        return calculate_leaderboard(matches, active_player_ids=self._get_active_player_ids())
+        return self.get_leaderboard(with_player_id=with_player_id, match_ids=match_ids)
 
-    def get_game_leaderboard(self, game_id: str) -> List[PlayerLeaderboardEntry]:
+    def get_game_leaderboard(
+        self,
+        game_id: str,
+        with_player_id: Optional[str] = None,
+        match_ids: Optional[Set[str]] = None,
+    ) -> List[PlayerLeaderboardEntry]:
         """Calculates leaderboard for a specific game across all active matches for active players."""
-        matches = self.match_repo.list_matches(game_id=game_id, include_inactive=False, limit=10000)
-        return calculate_leaderboard(matches, game_id=game_id, active_player_ids=self._get_active_player_ids())
+        return self.get_leaderboard(game_id=game_id, with_player_id=with_player_id, match_ids=match_ids)

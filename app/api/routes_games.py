@@ -1,12 +1,17 @@
 """API endpoints for games and image uploads."""
 import os
 import uuid
+import urllib.request
+import urllib.parse
+import re
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from app.api.schemas import GameCreateRequest, GameResponse
+from fastapi.responses import Response, RedirectResponse
+from app.api.schemas import GameCreateRequest, GameResponse, GameUpdateImageRequest, GameUpdateNameRequest
 from app.api.dependencies import get_game_service, get_match_repo
 from app.services.game_service import GameService
 from app.repositories.match_repo import MatchRepository
+from app.utils.image_validator import is_valid_image_url
 
 router = APIRouter(prefix="/api/games", tags=["Games"])
 
@@ -43,6 +48,9 @@ def create_game(
     req: GameCreateRequest,
     game_service: GameService = Depends(get_game_service),
 ):
+    if req.image_url:
+        if not is_valid_image_url(req.image_url):
+            raise HTTPException(status_code=400, detail="Lien d'image invalide ou format non supporté.")
     try:
         game = game_service.create_game(name=req.name, image_url=req.image_url)
         return GameResponse(
@@ -53,6 +61,55 @@ def create_game(
             is_active=game.is_active,
             created_at=game.created_at,
             matches_played=0,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/{game_id}/name", response_model=GameResponse)
+def update_game_name(
+    game_id: str,
+    req: GameUpdateNameRequest,
+    game_service: GameService = Depends(get_game_service),
+    match_repo: MatchRepository = Depends(get_match_repo),
+):
+    try:
+        game = game_service.update_game_name(game_id, req.name)
+        match_counts = match_repo.get_game_match_counts()
+        return GameResponse(
+            id=game.id,
+            name=game.name,
+            image_url=game.image_url,
+            created_by_action_id=game.created_by_action_id,
+            is_active=game.is_active,
+            created_at=game.created_at,
+            matches_played=match_counts.get(game.id, 0),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/{game_id}/image", response_model=GameResponse)
+@router.put("/{game_id}/image", response_model=GameResponse)
+def update_game_image(
+    game_id: str,
+    req: GameUpdateImageRequest,
+    game_service: GameService = Depends(get_game_service),
+    match_repo: MatchRepository = Depends(get_match_repo),
+):
+    if not is_valid_image_url(req.image_url):
+        raise HTTPException(status_code=400, detail="Lien d'image invalide ou format non supporté.")
+    try:
+        game = game_service.update_game_image(game_id, req.image_url)
+        match_counts = match_repo.get_game_match_counts()
+        return GameResponse(
+            id=game.id,
+            name=game.name,
+            image_url=game.image_url,
+            created_by_action_id=game.created_by_action_id,
+            is_active=game.is_active,
+            created_at=game.created_at,
+            matches_played=match_counts.get(game.id, 0),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -81,6 +138,70 @@ async def upload_game_image(file: UploadFile = File(...)):
         f.write(content)
 
     return {"url": f"/uploads/{filename}", "filename": filename}
+
+
+@router.get("/search-cover")
+def search_game_cover(name: str = Query(..., min_length=1)):
+    """
+    Searches online for a board game box cover given its name.
+    Returns the first best match and a list of alternative candidate URLs.
+    """
+    clean_name = name.strip()
+    if not clean_name:
+        return {"found": False, "image_url": None, "candidates": []}
+
+    query = f"{clean_name} jeu de societe boite"
+    search_url = f"https://www.bing.com/images/search?q={urllib.parse.quote(query)}&FORM=HDRSC2"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+    }
+
+    try:
+        req = urllib.request.Request(search_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=6.0) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+
+        murls = re.findall(r'murl&quot;:&quot;(https?://[^&]+?)&quot;', html)
+        candidates = []
+        for u in murls:
+            u_clean = u.split("?")[0].lower()
+            if any(u_clean.endswith(ext) for ext in [".svg", ".gif"]):
+                continue
+            if any(bad in u.lower() for bad in ["coloriage", "coloring", "clipart", "vector"]):
+                continue
+            candidates.append(u)
+
+        if candidates:
+            return {
+                "found": True,
+                "image_url": candidates[0],
+                "candidates": candidates[:6],
+            }
+    except Exception:
+        pass
+
+    return {"found": False, "image_url": None, "candidates": []}
+
+
+@router.get("/proxy-image")
+def proxy_image(url: str = Query(...)):
+    """Proxies an image to allow canvas cropping without CORS issues."""
+    if not is_valid_image_url(url):
+        raise HTTPException(status_code=400, detail="URL d'image invalide")
+    if url.startswith("/uploads/") or url.startswith("/static/"):
+        return RedirectResponse(url=url)
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+        )
+        with urllib.request.urlopen(req, timeout=6.0) as resp:
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
+            data = resp.read()
+            return Response(content=data, media_type=content_type, headers={"Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Impossible de récupérer l'image : {e}")
 
 
 @router.get("/{game_id}", response_model=GameResponse)

@@ -45,6 +45,7 @@ def init_db(db_path: Optional[str] = None) -> None:
                 CREATE TABLE IF NOT EXISTS players (
                     id TEXT PRIMARY KEY,
                     name TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                    image_url TEXT,
                     created_by_action_id TEXT NOT NULL,
                     is_active INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
@@ -75,6 +76,7 @@ def init_db(db_path: Optional[str] = None) -> None:
 
                 CREATE INDEX IF NOT EXISTS idx_matches_game ON matches (game_id);
                 CREATE INDEX IF NOT EXISTS idx_matches_played_at ON matches (played_at);
+                CREATE INDEX IF NOT EXISTS idx_matches_active_played ON matches (is_active, played_at);
 
                 CREATE TABLE IF NOT EXISTS match_scores (
                     id TEXT PRIMARY KEY,
@@ -88,7 +90,15 @@ def init_db(db_path: Optional[str] = None) -> None:
 
                 CREATE INDEX IF NOT EXISTS idx_match_scores_match ON match_scores (match_id);
                 CREATE INDEX IF NOT EXISTS idx_match_scores_player ON match_scores (player_id);
+                CREATE INDEX IF NOT EXISTS idx_match_scores_match_player ON match_scores (match_id, player_id);
+
+                CREATE INDEX IF NOT EXISTS idx_games_active_name ON games (is_active, name);
+                CREATE INDEX IF NOT EXISTS idx_players_active_name ON players (is_active, name);
                 """
             )
+            # Ensure migrations / new columns exist
+            player_cols = [r[1] for r in conn.execute("PRAGMA table_info(players)").fetchall()]
+            if "image_url" not in player_cols:
+                conn.execute("ALTER TABLE players ADD COLUMN image_url TEXT DEFAULT NULL;")
     finally:
         conn.close()

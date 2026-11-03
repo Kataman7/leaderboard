@@ -4,9 +4,10 @@ __pycache__/
 .venv/
 .deps/
 *.db
+*.db*
 *.db-journal
 *.db-wal
 *.db-shm
-data/*.db
+data/*.db*
 data/uploads/*
 !data/uploads/.gitkeep

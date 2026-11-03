@@ -10,6 +10,8 @@ class ActionType(str, Enum):
     CREATE_GAME = "CREATE_GAME"
     RECORD_MATCH = "RECORD_MATCH"
     UNDO_ACTION = "UNDO_ACTION"
+    UPDATE_GAME = "UPDATE_GAME"
+    UPDATE_PLAYER = "UPDATE_PLAYER"
 
 
 class EntityType(str, Enum):
@@ -37,6 +39,7 @@ class Player:
     id: str
     name: str
     created_by_action_id: str
+    image_url: Optional[str] = None
     is_active: bool = True
     created_at: Optional[str] = None
 
@@ -84,3 +87,4 @@ class PlayerLeaderboardEntry:
     total_score: float = 0.0
     highest_score: Optional[float] = None
     average_score: float = 0.0
+    player_image_url: Optional[str] = None

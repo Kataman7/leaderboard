@@ -6,11 +6,21 @@ from pydantic import BaseModel, Field
 # --- Players ---
 class PlayerCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
+    image_url: Optional[str] = None
+
+
+class PlayerUpdateNameRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+
+
+class PlayerUpdateImageRequest(BaseModel):
+    image_url: Optional[str] = None
 
 
 class PlayerResponse(BaseModel):
     id: str
     name: str
+    image_url: Optional[str] = None
     created_by_action_id: str
     is_active: bool
     created_at: Optional[str] = None
@@ -20,6 +30,14 @@ class PlayerResponse(BaseModel):
 class GameCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     image_url: Optional[str] = None
+
+
+class GameUpdateNameRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+class GameUpdateImageRequest(BaseModel):
+    image_url: str = Field(..., min_length=1)
 
 
 class GameResponse(BaseModel):
@@ -93,3 +111,18 @@ class LeaderboardEntryResponse(BaseModel):
     total_score: float
     highest_score: Optional[float] = None
     average_score: float
+    player_image_url: Optional[str] = None
+
+
+# --- Sessions ---
+class SessionResponse(BaseModel):
+    id: str
+    name: str
+    short_name: str
+    emoji: str
+    start_time: str
+    end_time: str
+    matches_count: int
+    game_names: List[str]
+    player_ids: List[str]
+    match_ids: List[str]

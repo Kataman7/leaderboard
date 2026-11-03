@@ -1,7 +1,7 @@
 """FastAPI application entrypoint."""
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -42,6 +42,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    # Critical files that must NEVER be cached by browser/proxies to avoid hard refresh
+    if path in ("/", "/sw.js", "/index.html", "/manifest.json") or path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 # Include API routers
 app.include_router(players_router)
 app.include_router(games_router)
@@ -62,7 +74,9 @@ if os.path.exists(STATIC_DIR):
 @app.get("/manifest.json")
 def get_manifest():
     manifest_path = os.path.join(STATIC_DIR, "manifest.json")
-    return FileResponse(manifest_path, media_type="application/manifest+json")
+    response = FileResponse(manifest_path, media_type="application/manifest+json")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 
 @app.get("/sw.js")
@@ -70,6 +84,7 @@ def get_service_worker():
     sw_path = os.path.join(STATIC_DIR, "sw.js")
     response = FileResponse(sw_path, media_type="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
@@ -77,7 +92,9 @@ def get_service_worker():
 @app.get("/")
 def get_index():
     index_path = os.path.join(STATIC_DIR, "index.html")
-    return FileResponse(index_path, media_type="text/html")
+    response = FileResponse(index_path, media_type="text/html")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 
 @app.get("/health")

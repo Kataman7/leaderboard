@@ -61,6 +61,20 @@ class GameRepository:
                 (1 if is_active else 0, game_id),
             )
 
+    def update_game_name(self, game_id: str, new_name: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE games SET name = ? WHERE id = ?",
+                (new_name.strip(), game_id),
+            )
+
+    def update_game_image(self, game_id: str, image_url: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE games SET image_url = ? WHERE id = ?",
+                (image_url.strip(), game_id),
+            )
+
     def _row_to_game(self, row: sqlite3.Row) -> Game:
         return Game(
             id=row["id"],

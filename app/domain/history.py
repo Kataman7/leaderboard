@@ -81,19 +81,17 @@ def get_active_cancelling_undo(action_id: str, actions: List[Action]) -> Optiona
 def calculate_leaderboard(
     matches: List[Match],
     game_id: Optional[str] = None,
+    with_player_id: Optional[str] = None,
+    match_ids: Optional[Set[str]] = None,
     active_player_ids: Optional[Set[str]] = None,
+    player_images: Optional[Dict[str, Optional[str]]] = None,
 ) -> List[PlayerLeaderboardEntry]:
     """
     Calculates leaderboard rankings based on active matches.
     If game_id is specified, computes stats for that specific game.
-    Otherwise computes global leaderboard across all games.
+    If with_player_id is specified, only includes matches where that player participated.
+    If match_ids is specified, only includes matches in that set (e.g. for a specific session).
     If active_player_ids is provided, excludes players that are cancelled/inactive.
-
-    Sorting criteria:
-    1. Win ratio descending (wins / matches)
-    2. Total wins descending (tie breaker)
-    3. Total matches played descending (tie breaker)
-    4. Average score descending (tie breaker)
     """
     stats: Dict[str, Dict] = {}
 
@@ -101,6 +99,10 @@ def calculate_leaderboard(
         if not match.is_active:
             continue
         if game_id and match.game_id != game_id:
+            continue
+        if match_ids is not None and match.id not in match_ids:
+            continue
+        if with_player_id and not any(s.player_id == with_player_id for s in match.scores):
             continue
 
         for s in match.scores:
@@ -131,6 +133,7 @@ def calculate_leaderboard(
         won = data["matches_won"]
         ratio = round(won / played, 4) if played > 0 else 0.0
         avg_score = round(data["total_score"] / played, 2) if played > 0 else 0.0
+        img_url = (player_images or {}).get(pid)
 
         entries.append(
             PlayerLeaderboardEntry(
@@ -142,6 +145,7 @@ def calculate_leaderboard(
                 total_score=data["total_score"],
                 highest_score=data["highest_score"],
                 average_score=avg_score,
+                player_image_url=img_url,
             )
         )
 
