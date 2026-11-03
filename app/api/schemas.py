@@ -112,6 +112,7 @@ class LeaderboardEntryResponse(BaseModel):
     highest_score: Optional[float] = None
     average_score: float
     player_image_url: Optional[str] = None
+    score: float = 0.0
 
 
 # --- Sessions ---

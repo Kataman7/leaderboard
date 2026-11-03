@@ -39,7 +39,7 @@ const state = {
   selectedLbGameId: null, // null for global, or game_id
   selectedLbPlayerId: null, // null or player_id
   selectedLbSessionId: null, // null or session_id
-  leaderboardSort: 'ratio', // 'ratio' | 'wins'
+  leaderboardSort: 'score', // 'score' (default) | 'ratio' | 'wins'
   players: [],
   games: [],
   sessions: [],
@@ -569,21 +569,22 @@ function setLeaderboardSort(mode) {
   if (state.leaderboardSort === mode) return;
   state.leaderboardSort = mode;
 
+  const btnScore = document.getElementById('btnSortScore');
   const btnRatio = document.getElementById('btnSortRatio');
   const btnWins = document.getElementById('btnSortWins');
-  if (btnRatio && btnWins) {
-    if (mode === 'ratio') {
-      btnRatio.classList.add('active');
-      btnWins.classList.remove('active');
-    } else {
-      btnRatio.classList.remove('active');
-      btnWins.classList.add('active');
-    }
-  }
+  if (btnScore) btnScore.classList.toggle('active', mode === 'score');
+  if (btnRatio) btnRatio.classList.toggle('active', mode === 'ratio');
+  if (btnWins) btnWins.classList.toggle('active', mode === 'wins');
 
   const subtitle = document.getElementById('lbSubtitle');
   if (subtitle) {
-    subtitle.textContent = mode === 'ratio' ? 'Basé sur le ratio' : 'Basé sur les wins';
+    if (mode === 'score') {
+      subtitle.textContent = 'Basé sur le score';
+    } else if (mode === 'ratio') {
+      subtitle.textContent = 'Basé sur le ratio';
+    } else {
+      subtitle.textContent = 'Basé sur les wins';
+    }
   }
 
   renderLeaderboard();
@@ -630,14 +631,39 @@ function renderLeaderboard() {
     return;
   }
 
-  // Sort based on state.leaderboardSort ('ratio' or 'wins')
-  const sortByWins = state.leaderboardSort === 'wins';
+  // Calculate global winrate across all participating entries in this view
+  const totalWins = entries.reduce((acc, e) => acc + (e.matches_won || 0), 0);
+  const totalPlayed = entries.reduce((acc, e) => acc + (e.matches_played || 0), 0);
+  const globalWinrate = totalPlayed > 0 ? (totalWins / totalPlayed) : 0;
+
+  // Compute score for each entry: (victoires_joueur + 5 * winrate_global) / (parties_joueur + 5)
+  // If player has 0 matches played, score is 0.
+  entries.forEach(e => {
+    const played = e.matches_played || 0;
+    const won = e.matches_won || 0;
+    if (played === 0) {
+      e.score = 0;
+    } else {
+      e.score = (won + 5 * globalWinrate) / (played + 5);
+    }
+  });
+
+  // Sort based on state.leaderboardSort ('score', 'wins', or 'ratio')
+  const sortMode = state.leaderboardSort || 'score';
   entries.sort((a, b) => {
-    if (sortByWins) {
+    if (sortMode === 'wins') {
       if (b.matches_won !== a.matches_won) return b.matches_won - a.matches_won;
+      if (b.score !== a.score) return b.score - a.score;
       if (b.win_ratio !== a.win_ratio) return b.win_ratio - a.win_ratio;
       return b.matches_played - a.matches_played;
+    } else if (sortMode === 'ratio') {
+      if (b.win_ratio !== a.win_ratio) return b.win_ratio - a.win_ratio;
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.matches_won !== a.matches_won) return b.matches_won - a.matches_won;
+      return b.matches_played - a.matches_played;
     } else {
+      // Default: 'score'
+      if (b.score !== a.score) return b.score - a.score;
       if (b.win_ratio !== a.win_ratio) return b.win_ratio - a.win_ratio;
       if (b.matches_won !== a.matches_won) return b.matches_won - a.matches_won;
       return b.matches_played - a.matches_played;
@@ -651,15 +677,23 @@ function renderLeaderboard() {
   const formatPodiumMetric = (p) => {
     const winsLabel = p.matches_won > 1 ? 'wins' : 'win';
     const gamesLabel = p.matches_played > 1 ? 'games' : 'game';
-    if (sortByWins) {
+    const scoreVal = p.matches_played > 0 ? `${Math.round(p.score * 1000)}` : '0';
+    const ratioPct = p.matches_played > 0 ? `${(p.win_ratio * 100).toFixed(0)}%` : '0%';
+
+    if (sortMode === 'score') {
+      return `
+        <div class="podium-ratio">${scoreVal}</div>
+        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${ratioPct} ratio</div>
+      `;
+    } else if (sortMode === 'wins') {
       return `
         <div class="podium-ratio">${p.matches_won} ${winsLabel}</div>
-        <div class="podium-sub">${(p.win_ratio * 100).toFixed(0)}% • ${p.matches_played} ${gamesLabel}</div>
+        <div class="podium-sub">${scoreVal} score • ${ratioPct} ratio</div>
       `;
     } else {
       return `
-        <div class="podium-ratio">${(p.win_ratio * 100).toFixed(0)}%</div>
-        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${p.matches_played} ${gamesLabel}</div>
+        <div class="podium-ratio">${ratioPct}</div>
+        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${scoreVal} score</div>
       `;
     }
   };
@@ -741,14 +775,22 @@ function renderLeaderboard() {
     const gamesLabel = entry.matches_played > 1 ? 'games' : 'game';
 
     let cardRightHtml = '';
-    if (sortByWins) {
+    const scoreVal = entry.matches_played > 0 ? `${Math.round(entry.score * 1000)}` : '0';
+    const ratioPct = entry.matches_played > 0 ? `${(entry.win_ratio * 100).toFixed(0)}%` : '0%';
+
+    if (sortMode === 'score') {
+      cardRightHtml = `
+        <div class="lb-ratio">${scoreVal}</div>
+        <div class="lb-ratio-label">Score</div>
+      `;
+    } else if (sortMode === 'wins') {
       cardRightHtml = `
         <div class="lb-ratio">${entry.matches_won}</div>
         <div class="lb-ratio-label">${winsLabel}</div>
       `;
     } else {
       cardRightHtml = `
-        <div class="lb-ratio">${(entry.win_ratio * 100).toFixed(0)}%</div>
+        <div class="lb-ratio">${ratioPct}</div>
         <div class="lb-ratio-label">Ratio</div>
       `;
     }

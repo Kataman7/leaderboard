@@ -88,3 +88,4 @@ class PlayerLeaderboardEntry:
     highest_score: Optional[float] = None
     average_score: float = 0.0
     player_image_url: Optional[str] = None
+    score: float = 0.0

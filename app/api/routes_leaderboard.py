@@ -46,6 +46,7 @@ def get_leaderboard(
             highest_score=e.highest_score,
             average_score=e.average_score,
             player_image_url=e.player_image_url,
+            score=e.score,
         )
         for e in entries
     ]

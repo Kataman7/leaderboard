@@ -110,3 +110,37 @@ def test_leaderboard_excludes_cancelled_players():
     assert player_names == ["Alice", "Bob"]
     assert leaderboard[0].rank == 1
     assert leaderboard[1].rank == 2
+
+
+def test_leaderboard_score_calculation():
+    """Score calculation formula: (wins + 5 * winrate_global) / (played + 5)."""
+    # Alice: 2 played, 2 won
+    # Bob: 3 played, 2 won
+    # Charlie: 2 played, 0 won
+    # David: 1 played, 0 won
+    # Total wins = 4, Total played = 8 -> winrate_global = 4 / 8 = 0.5
+    m1 = make_match("m1", "g1", [("p1", "Alice", 50, True), ("p2", "Bob", 40, False)])
+    m2 = make_match("m2", "g1", [("p1", "Alice", 60, True), ("p3", "Charlie", 30, False)])
+    m3 = make_match("m3", "g1", [("p2", "Bob", 55, True), ("p3", "Charlie", 20, False)])
+    m4 = make_match("m4", "g1", [("p2", "Bob", 70, True), ("p4", "David", 35, False)])
+
+    leaderboard = calculate_leaderboard([m1, m2, m3, m4])
+
+    # winrate_global = 0.5
+    # Alice: (2 + 5 * 0.5) / (2 + 5) = 4.5 / 7 = 0.6429
+    # Bob: (2 + 5 * 0.5) / (3 + 5) = 4.5 / 8 = 0.5625
+    # David: (0 + 5 * 0.5) / (1 + 5) = 2.5 / 6 = 0.4167
+    # Charlie: (0 + 5 * 0.5) / (2 + 5) = 2.5 / 7 = 0.3571
+    p_map = {e.player_name: e for e in leaderboard}
+
+    assert round(p_map["Alice"].score, 4) == 0.6429
+    assert round(p_map["Bob"].score, 4) == 0.5625
+    assert round(p_map["David"].score, 4) == 0.4167
+    assert round(p_map["Charlie"].score, 4) == 0.3571
+
+    # Ranks sorted by score
+    assert leaderboard[0].player_name == "Alice"
+    assert leaderboard[1].player_name == "Bob"
+    assert leaderboard[2].player_name == "David"
+    assert leaderboard[3].player_name == "Charlie"
+

@@ -127,11 +127,16 @@ def calculate_leaderboard(
             if stats[pid]["highest_score"] is None or s.score > stats[pid]["highest_score"]:
                 stats[pid]["highest_score"] = s.score
 
+    total_wins = sum(data["matches_won"] for data in stats.values())
+    total_played = sum(data["matches_played"] for data in stats.values())
+    winrate_global = (total_wins / total_played) if total_played > 0 else 0.0
+
     entries: List[PlayerLeaderboardEntry] = []
     for pid, data in stats.items():
         played = data["matches_played"]
         won = data["matches_won"]
         ratio = round(won / played, 4) if played > 0 else 0.0
+        score = round((won + 5 * winrate_global) / (played + 5), 4) if played > 0 else 0.0
         avg_score = round(data["total_score"] / played, 2) if played > 0 else 0.0
         img_url = (player_images or {}).get(pid)
 
@@ -146,16 +151,18 @@ def calculate_leaderboard(
                 highest_score=data["highest_score"],
                 average_score=avg_score,
                 player_image_url=img_url,
+                score=score,
             )
         )
 
-    # Sort
+    # Sort (default ranking mode: score)
     entries.sort(
         key=lambda e: (
+            e.score,
             e.win_ratio,
             e.matches_won,
             e.matches_played,
-            e.average_score
+            e.average_score,
         ),
         reverse=True,
     )
