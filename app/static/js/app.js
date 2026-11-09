@@ -684,17 +684,17 @@ function renderLeaderboard() {
       const tooltip = oppFaced > 0 ? `${oppDef} adversaires battus sur ${oppFaced}` : '';
       return `
         <div class="podium-ratio" title="${tooltip}">${scoreVal}</div>
-        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${ratioPct} ratio</div>
+        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${p.matches_played} ${gamesLabel}</div>
       `;
     } else if (sortMode === 'wins') {
       return `
         <div class="podium-ratio">${p.matches_won} ${winsLabel}</div>
-        <div class="podium-sub">${scoreVal} score • ${ratioPct} ratio</div>
+        <div class="podium-sub">${ratioPct} • ${p.matches_played} ${gamesLabel}</div>
       `;
     } else {
       return `
         <div class="podium-ratio">${ratioPct}</div>
-        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${scoreVal} score</div>
+        <div class="podium-sub">${p.matches_won} ${winsLabel} • ${p.matches_played} ${gamesLabel}</div>
       `;
     }
   };
