@@ -105,6 +105,11 @@ def calculate_leaderboard(
         if with_player_id and not any(s.player_id == with_player_id for s in match.scores):
             continue
 
+        total_players = len(match.scores)
+        total_winners = sum(1 for s in match.scores if s.is_winner)
+        losers = max(0, total_players - total_winners)
+        opp_faced_match = max(0, total_players - 1)
+
         for s in match.scores:
             pid = s.player_id
             if active_player_ids is not None and pid not in active_player_ids:
@@ -116,27 +121,30 @@ def calculate_leaderboard(
                     "player_name": s.player_name,
                     "matches_played": 0,
                     "matches_won": 0,
+                    "opponents_defeated": 0,
+                    "opponents_faced": 0,
                     "total_score": 0.0,
                     "highest_score": s.score,
                 }
 
             stats[pid]["matches_played"] += 1
+            stats[pid]["opponents_faced"] += opp_faced_match
             if s.is_winner:
                 stats[pid]["matches_won"] += 1
+                stats[pid]["opponents_defeated"] += losers
             stats[pid]["total_score"] += s.score
             if stats[pid]["highest_score"] is None or s.score > stats[pid]["highest_score"]:
                 stats[pid]["highest_score"] = s.score
-
-    total_wins = sum(data["matches_won"] for data in stats.values())
-    total_played = sum(data["matches_played"] for data in stats.values())
-    winrate_global = (total_wins / total_played) if total_played > 0 else 0.0
 
     entries: List[PlayerLeaderboardEntry] = []
     for pid, data in stats.items():
         played = data["matches_played"]
         won = data["matches_won"]
+        opp_def = data["opponents_defeated"]
+        opp_faced = data["opponents_faced"]
         ratio = round(won / played, 4) if played > 0 else 0.0
-        score = round((won + 5 * winrate_global) / (played + 5), 4) if played > 0 else 0.0
+        # Proposition 3: Score based on opponents defeated ratio with Bayesian uncertainty damping (K=20)
+        score = round(opp_def / (opp_faced + 20), 4) if (opp_faced > 0 and opp_def > 0) else 0.0
         avg_score = round(data["total_score"] / played, 2) if played > 0 else 0.0
         img_url = (player_images or {}).get(pid)
 
@@ -152,6 +160,8 @@ def calculate_leaderboard(
                 average_score=avg_score,
                 player_image_url=img_url,
                 score=score,
+                opponents_defeated=opp_def,
+                opponents_faced=opp_faced,
             )
         )
 

@@ -579,7 +579,7 @@ function setLeaderboardSort(mode) {
   const subtitle = document.getElementById('lbSubtitle');
   if (subtitle) {
     if (mode === 'score') {
-      subtitle.textContent = 'Basé sur le score';
+      subtitle.textContent = 'Basé sur les adversaires battus';
     } else if (mode === 'ratio') {
       subtitle.textContent = 'Basé sur le ratio';
     } else {
@@ -631,20 +631,18 @@ function renderLeaderboard() {
     return;
   }
 
-  // Calculate global winrate across all participating entries in this view
-  const totalWins = entries.reduce((acc, e) => acc + (e.matches_won || 0), 0);
-  const totalPlayed = entries.reduce((acc, e) => acc + (e.matches_played || 0), 0);
-  const globalWinrate = totalPlayed > 0 ? (totalWins / totalPlayed) : 0;
-
-  // Compute score for each entry: (victoires_joueur + 5 * winrate_global) / (parties_joueur + 5)
-  // If player has 0 matches played, score is 0.
+  // Compute score for each entry: Proposition 3 (Opponents Defeated Ratio)
+  // score = opponents_defeated / (opponents_faced + 20)
+  // If player has 0 matches played or 0 wins, score is 0.
   entries.forEach(e => {
-    const played = e.matches_played || 0;
-    const won = e.matches_won || 0;
-    if (played === 0) {
+    const oppDef = e.opponents_defeated !== undefined ? e.opponents_defeated : 0;
+    const oppFaced = e.opponents_faced !== undefined ? e.opponents_faced : 0;
+    if ((e.matches_played || 0) === 0 || oppDef === 0 || oppFaced === 0) {
       e.score = 0;
+    } else if (e.score !== undefined && e.score !== null && !isNaN(e.score)) {
+      e.score = e.score;
     } else {
-      e.score = (won + 5 * globalWinrate) / (played + 5);
+      e.score = oppDef / (oppFaced + 20);
     }
   });
 
@@ -681,8 +679,11 @@ function renderLeaderboard() {
     const ratioPct = p.matches_played > 0 ? `${(p.win_ratio * 100).toFixed(0)}%` : '0%';
 
     if (sortMode === 'score') {
+      const oppDef = p.opponents_defeated || 0;
+      const oppFaced = p.opponents_faced || 0;
+      const tooltip = oppFaced > 0 ? `${oppDef} adversaires battus sur ${oppFaced}` : '';
       return `
-        <div class="podium-ratio">${scoreVal}</div>
+        <div class="podium-ratio" title="${tooltip}">${scoreVal}</div>
         <div class="podium-sub">${p.matches_won} ${winsLabel} • ${ratioPct} ratio</div>
       `;
     } else if (sortMode === 'wins') {
@@ -779,8 +780,11 @@ function renderLeaderboard() {
     const ratioPct = entry.matches_played > 0 ? `${(entry.win_ratio * 100).toFixed(0)}%` : '0%';
 
     if (sortMode === 'score') {
+      const oppDef = entry.opponents_defeated || 0;
+      const oppFaced = entry.opponents_faced || 0;
+      const tooltip = oppFaced > 0 ? `${oppDef} adversaires battus sur ${oppFaced}` : '';
       cardRightHtml = `
-        <div class="lb-ratio">${scoreVal}</div>
+        <div class="lb-ratio" title="${tooltip}">${scoreVal}</div>
         <div class="lb-ratio-label">Score</div>
       `;
     } else if (sortMode === 'wins') {

@@ -107,6 +107,8 @@ def test_leaderboard_filters_and_recent_players(client: TestClient):
     assert len(lb_all) == 3
     assert "score" in lb_all[0]
     assert lb_all[0]["score"] >= 0.0
+    assert "opponents_defeated" in lb_all[0]
+    assert "opponents_faced" in lb_all[0]
 
     # Filter leaderboard: games with Charlie -> only Bob and Charlie
     lb_charlie = client.get(f"/api/leaderboard?player_id={p3['id']}").json()

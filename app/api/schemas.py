@@ -113,6 +113,8 @@ class LeaderboardEntryResponse(BaseModel):
     average_score: float
     player_image_url: Optional[str] = None
     score: float = 0.0
+    opponents_defeated: int = 0
+    opponents_faced: int = 0
 
 
 # --- Sessions ---
