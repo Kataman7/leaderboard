@@ -248,3 +248,42 @@ def test_games_sorted_by_matches_played(client):
     assert games[0]["matches_played"] == 2
     assert games[1]["id"] == g_rare
     assert games[1]["matches_played"] == 1
+
+
+def test_undo_and_reinstate_with_actor_attribution(client):
+    """Test that cancelled_by and reinstated_by are properly recorded and exposed."""
+    p1 = client.post("/api/players", json={"name": "Alice"}).json()["id"]
+    p2 = client.post("/api/players", json={"name": "Bob"}).json()["id"]
+    g1 = client.post("/api/games", json={"name": "Catan"}).json()["id"]
+
+    res = client.post("/api/matches", json={
+        "game_id": g1,
+        "scores": [
+            {"player_id": p1, "score": 10.0, "is_winner": True},
+            {"player_id": p2, "score": 8.0, "is_winner": False},
+        ]
+    })
+    match_action_id = res.json()["created_by_action_id"]
+
+    # Cancel with actor
+    res_undo = client.post(f"/api/history/{match_action_id}/undo", json={"cancelled_by": "Antonin"})
+    assert res_undo.status_code == 200
+    assert res_undo.json()["cancelled_by"] == "Antonin"
+
+    # Verify history exposes cancelled_by on the inactive match action
+    res_hist = client.get("/api/history")
+    hist = res_hist.json()
+    match_card = next(a for a in hist if a["id"] == match_action_id)
+    assert match_card["is_active"] is False
+    assert match_card["cancelled_by"] == "Antonin"
+    assert match_card["cancelled_at"] is not None
+
+    # Reinstate with actor
+    res_reinstate = client.post(f"/api/history/{match_action_id}/reinstate", json={"reinstated_by": "Mathis"})
+    assert res_reinstate.status_code == 200
+
+    # Verify history has match active again
+    res_hist2 = client.get("/api/history")
+    hist2 = res_hist2.json()
+    match_card_restored = next(a for a in hist2 if a["id"] == match_action_id)
+    assert match_card_restored["is_active"] is True

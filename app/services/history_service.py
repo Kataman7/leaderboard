@@ -50,7 +50,7 @@ class HistoryService:
         self.sync_entity_projections()
         return action
 
-    def undo_action(self, target_action_id: str) -> Action:
+    def undo_action(self, target_action_id: str, cancelled_by: Optional[str] = None) -> Action:
         """
         Creates a new UNDO_ACTION in the history targeting `target_action_id`.
         If target_action is active, this cancels it.
@@ -60,11 +60,27 @@ class HistoryService:
         if not target_action:
             raise ValueError(f"Action '{target_action_id}' non trouvée.")
 
-        # Determine summary description
+        # Find root non-undo action to produce clean summaries without recursive nesting
+        root_action = target_action
+        visited = {target_action.id}
+        while root_action.target_action_id and root_action.action_type == ActionType.UNDO_ACTION:
+            parent = self.action_repo.get_action(root_action.target_action_id)
+            if not parent or parent.id in visited:
+                break
+            visited.add(parent.id)
+            root_action = parent
+
+        # Clean any historical recursion prefixes if present in old data
+        clean_root_summary = root_action.summary
+        for prefix in ("Rétablissement de : ", "Annulation de : ", "Rétablissement : ", "Annulation : "):
+            while clean_root_summary.startswith(prefix):
+                clean_root_summary = clean_root_summary[len(prefix):]
+
+        actor_str = f" par {cancelled_by}" if cancelled_by else ""
         if target_action.action_type == ActionType.UNDO_ACTION:
-            summary = f"Rétablissement de : {target_action.details.get('target_summary', 'Action')}"
+            summary = f"Rétablissement{actor_str} : {clean_root_summary}"
         else:
-            summary = f"Annulation de : {target_action.summary}"
+            summary = f"Annulation{actor_str} : {clean_root_summary}"
 
         details = {
             "target_action_id": target_action.id,
@@ -72,6 +88,7 @@ class HistoryService:
             "target_entity_type": target_action.entity_type.value,
             "target_entity_id": target_action.entity_id,
             "target_summary": target_action.summary,
+            "cancelled_by": cancelled_by,
         }
 
         undo_action = self.record_action(
@@ -84,7 +101,7 @@ class HistoryService:
         )
         return undo_action
 
-    def reinstate_action(self, action_id: str) -> Action:
+    def reinstate_action(self, action_id: str, reinstated_by: Optional[str] = None) -> Action:
         """
         Reinstates a cancelled action.
         Finds the active UNDO_ACTION that is currently cancelling this action,
@@ -95,7 +112,7 @@ class HistoryService:
         if not cancelling_undo:
             raise ValueError(f"L'action '{action_id}' n'est pas actuellement annulée.")
 
-        return self.undo_action(cancelling_undo.id)
+        return self.undo_action(cancelling_undo.id, cancelled_by=reinstated_by)
 
     def sync_entity_projections(self) -> None:
         """
@@ -133,6 +150,15 @@ class HistoryService:
             is_active = states.get(a.id, True)
             cancelling_undo = get_active_cancelling_undo(a.id, all_actions) if not is_active else None
 
+            cancelled_by = None
+            cancelled_at = None
+            if cancelling_undo:
+                cancelled_by = cancelling_undo.details.get("cancelled_by")
+                cancelled_at = cancelling_undo.created_at
+            elif a.action_type == ActionType.UNDO_ACTION:
+                cancelled_by = a.details.get("cancelled_by")
+                cancelled_at = a.created_at
+
             result.append(
                 {
                     "id": a.id,
@@ -147,6 +173,8 @@ class HistoryService:
                     "can_undo": is_active,
                     "can_reinstate": not is_active,
                     "cancelling_undo_id": cancelling_undo.id if cancelling_undo else None,
+                    "cancelled_by": cancelled_by,
+                    "cancelled_at": cancelled_at,
                 }
             )
         return result

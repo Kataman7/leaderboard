@@ -85,6 +85,14 @@ class MatchResponse(BaseModel):
 
 
 # --- History & Undo ---
+class UndoActionRequest(BaseModel):
+    cancelled_by: Optional[str] = None
+
+
+class ReinstateActionRequest(BaseModel):
+    reinstated_by: Optional[str] = None
+
+
 class HistoryItemResponse(BaseModel):
     id: str
     action_type: str
@@ -98,6 +106,8 @@ class HistoryItemResponse(BaseModel):
     can_undo: bool
     can_reinstate: bool
     cancelling_undo_id: Optional[str] = None
+    cancelled_by: Optional[str] = None
+    cancelled_at: Optional[str] = None
 
 
 # --- Leaderboard ---

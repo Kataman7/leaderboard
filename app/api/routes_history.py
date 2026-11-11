@@ -1,7 +1,7 @@
 """API endpoints for action history and undo/redo operations."""
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query
-from app.api.schemas import HistoryItemResponse
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from app.api.schemas import HistoryItemResponse, UndoActionRequest, ReinstateActionRequest
 from app.api.dependencies import get_history_service
 from app.services.history_service import HistoryService
 
@@ -21,10 +21,12 @@ def get_history(
 @router.post("/{action_id}/undo", response_model=HistoryItemResponse)
 def undo_action(
     action_id: str,
+    payload: Optional[UndoActionRequest] = Body(None),
     history_service: HistoryService = Depends(get_history_service),
 ):
     try:
-        undo_action = history_service.undo_action(action_id)
+        cancelled_by = payload.cancelled_by if payload else None
+        undo_action = history_service.undo_action(action_id, cancelled_by=cancelled_by)
         # Fetch fresh view of the newly created undo action
         history_items = history_service.get_history(limit=5)
         for item in history_items:
@@ -43,6 +45,8 @@ def undo_action(
             can_undo=True,
             can_reinstate=False,
             cancelling_undo_id=None,
+            cancelled_by=cancelled_by,
+            cancelled_at=undo_action.created_at,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -51,10 +55,12 @@ def undo_action(
 @router.post("/{action_id}/reinstate", response_model=HistoryItemResponse)
 def reinstate_action(
     action_id: str,
+    payload: Optional[ReinstateActionRequest] = Body(None),
     history_service: HistoryService = Depends(get_history_service),
 ):
     try:
-        reinstate_action = history_service.reinstate_action(action_id)
+        reinstated_by = payload.reinstated_by if payload else None
+        reinstate_action = history_service.reinstate_action(action_id, reinstated_by=reinstated_by)
         history_items = history_service.get_history(limit=5)
         for item in history_items:
             if item["id"] == reinstate_action.id:
@@ -72,6 +78,8 @@ def reinstate_action(
             can_undo=True,
             can_reinstate=False,
             cancelling_undo_id=None,
+            cancelled_by=reinstated_by,
+            cancelled_at=reinstate_action.created_at,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

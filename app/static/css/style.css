@@ -1326,15 +1326,90 @@ select:focus,
 }
 
 .history-card.is-cancelled {
-  opacity: 0.65;
+  opacity: 0.85;
   background: var(--bg-subtle);
   border-style: dashed;
+  border-color: rgba(220, 38, 38, 0.35);
 }
 
-.history-card.is-cancelled .history-title,
-.history-card.is-cancelled .history-details-compact {
+.history-card.is-cancelled .history-title {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+
+.history-cancelled-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 4px;
+  padding: 2px 7px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.history-cancelled-meta svg {
+  flex-shrink: 0;
+}
+
+.history-cancelled-meta strong {
+  font-weight: 700;
+  color: #991b1b;
+}
+
+/* Actor Picker Grid */
+.actor-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.actor-picker-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+  text-align: left;
+  user-select: none;
+}
+
+.actor-picker-chip:hover, .actor-picker-chip:focus {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.actor-picker-chip.is-last-actor {
+  border-color: var(--accent);
+  position: relative;
+}
+
+.actor-picker-chip.is-last-actor::after {
+  content: "Dernier";
+  position: absolute;
+  top: -6px;
+  right: 6px;
+  font-size: 0.58rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .history-row-main {
