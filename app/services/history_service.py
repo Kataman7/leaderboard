@@ -76,11 +76,10 @@ class HistoryService:
             while clean_root_summary.startswith(prefix):
                 clean_root_summary = clean_root_summary[len(prefix):]
 
-        actor_str = f" par {cancelled_by}" if cancelled_by else ""
         if target_action.action_type == ActionType.UNDO_ACTION:
-            summary = f"Rétablissement{actor_str} : {clean_root_summary}"
+            summary = f"Rétablissement de : {clean_root_summary}"
         else:
-            summary = f"Annulation{actor_str} : {clean_root_summary}"
+            summary = f"Annulation de : {clean_root_summary}"
 
         details = {
             "target_action_id": target_action.id,

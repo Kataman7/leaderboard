@@ -1360,58 +1360,6 @@ select:focus,
   color: #991b1b;
 }
 
-/* Actor Picker Grid */
-.actor-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 8px;
-  margin: 12px 0;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.actor-picker-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm, 6px);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  transition: all 0.15s ease;
-  text-align: left;
-  user-select: none;
-}
-
-.actor-picker-chip:hover, .actor-picker-chip:focus {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  transform: translateY(-1px);
-}
-
-.actor-picker-chip.is-last-actor {
-  border-color: var(--accent);
-  position: relative;
-}
-
-.actor-picker-chip.is-last-actor::after {
-  content: "Dernier";
-  position: absolute;
-  top: -6px;
-  right: 6px;
-  font-size: 0.58rem;
-  background: var(--accent);
-  color: #fff;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
 .history-row-main {
   display: flex;
   align-items: center;

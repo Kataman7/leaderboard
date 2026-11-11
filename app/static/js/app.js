@@ -1246,8 +1246,6 @@ function clearHistoryDateFilter() {
   renderHistory();
 }
 
-let pendingActorAction = null;
-
 function renderHistory() {
   const listEl = document.getElementById('historyList');
   if (!listEl) return;
@@ -1305,13 +1303,13 @@ function renderHistory() {
     let actionBtnHtml = '';
     if (isActive) {
       actionBtnHtml = `
-        <button class="btn-history-action btn-undo" data-id="${action.id}" onclick="promptUndo(this.getAttribute('data-id'))" title="Annuler cette action">
+        <button class="btn-history-action btn-undo" onclick="triggerUndo('${action.id}')" title="Annuler cette action">
           Annuler
         </button>
       `;
     } else {
       actionBtnHtml = `
-        <button class="btn-history-action btn-reinstate" data-id="${action.id}" onclick="promptReinstate(this.getAttribute('data-id'))" title="Rétablir cette action">
+        <button class="btn-history-action btn-reinstate" onclick="triggerReinstate('${action.id}')" title="Rétablir cette action">
           Rétablir
         </button>
       `;
@@ -1320,14 +1318,13 @@ function renderHistory() {
     // Cancellation meta banner if cancelled
     let cancelledMetaHtml = '';
     if (!isActive) {
-      const actorLabel = action.cancelled_by ? ` par <strong>${escapeHtml(action.cancelled_by)}</strong>` : '';
       const timeLabel = action.cancelled_at ? ` • ${formatIsoDate(action.cancelled_at)}` : '';
       cancelledMetaHtml = `
         <div class="history-cancelled-meta">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
           </svg>
-          <span>Annulée${actorLabel}${timeLabel}</span>
+          <span>Action annulée${timeLabel}</span>
         </div>
       `;
     }
@@ -1367,124 +1364,20 @@ function renderHistory() {
   listEl.innerHTML = html;
 }
 
-function promptUndo(actionId) {
-  const action = (state.history || []).find(a => a.id === actionId);
-  const summary = action ? action.summary : 'cette action';
-  openActorSelectionModal({
-    actionId,
-    title: 'Annuler une action',
-    actionLabel: 'annuler',
-    summary,
-    onConfirm: (actor) => triggerUndo(actionId, actor),
-  });
-}
-
-function promptReinstate(actionId) {
-  const action = (state.history || []).find(a => a.id === actionId);
-  const summary = action ? action.summary : 'cette action';
-  openActorSelectionModal({
-    actionId,
-    title: 'Rétablir une action',
-    actionLabel: 'rétablir',
-    summary,
-    onConfirm: (actor) => triggerReinstate(actionId, actor),
-  });
-}
-
-function openActorSelectionModal({ actionId, title, actionLabel, summary, onConfirm }) {
-  pendingActorAction = onConfirm;
-  const lastActor = localStorage.getItem('boardscores_last_actor') || '';
-
-  // Get active players
-  const activePlayers = (state.players || []).filter(p => p.is_active !== false);
-
-  const playerChipsHtml = activePlayers.map(p => {
-    const isLast = (p.name === lastActor);
-    return `
-      <button type="button" class="actor-picker-chip ${isLast ? 'is-last-actor' : ''}" data-actor="${escapeHtml(p.name)}" onclick="confirmActionActor(this.getAttribute('data-actor'))">
-        ${renderAvatarHtml(p.name, p.image_url, 30)}
-        <span class="actor-picker-name">${escapeHtml(p.name)}</span>
-      </button>
-    `;
-  }).join('');
-
-  const modalHtml = `
-    <div class="modal-header">
-      <div class="modal-title">${escapeHtml(title)}</div>
-      <button type="button" class="modal-close-btn" onclick="closeAppModal()">✕</button>
-    </div>
-    <div class="modal-body" style="padding: 16px 20px;">
-      <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">
-        Action ciblée : <strong style="color: var(--text-primary);">${escapeHtml(summary)}</strong>
-      </div>
-      <div style="font-size: 0.92rem; font-weight: 700; margin: 12px 0 6px 0;">
-        Qui effectue cette action ?
-      </div>
-      <div class="actor-picker-grid">
-        ${playerChipsHtml}
-      </div>
-
-      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);">
-        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <input type="text" id="customActorInput" class="custom-input" placeholder="Autre nom..." style="flex: 1; min-height: 36px;" onkeydown="if(event.key==='Enter') confirmCustomActorInput()">
-          <button type="button" class="btn btn-sm btn-secondary" onclick="confirmCustomActorInput()">Valider</button>
-        </div>
-        <button type="button" class="btn btn-sm btn-subtle" onclick="confirmActionActor(null)" style="width: 100%; font-size: 0.8rem; color: var(--text-muted); padding: 8px;">
-          Passer sans préciser
-        </button>
-      </div>
-    </div>
-  `;
-
-  openAppModal(modalHtml);
-}
-
-function confirmActionActor(actorName) {
-  closeAppModal();
-  if (actorName) {
-    try {
-      localStorage.setItem('boardscores_last_actor', actorName);
-    } catch {}
-  }
-  if (typeof pendingActorAction === 'function') {
-    const cb = pendingActorAction;
-    pendingActorAction = null;
-    cb(actorName);
-  }
-}
-
-function confirmCustomActorInput() {
-  const input = document.getElementById('customActorInput');
-  const val = input ? input.value.trim() : '';
-  confirmActionActor(val || null);
-}
-
-async function triggerUndo(actionId, actorName) {
+async function triggerUndo(actionId) {
   try {
-    const payload = actorName ? { cancelled_by: actorName } : {};
-    await apiCall(`/api/history/${actionId}/undo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const msg = actorName ? `Action annulée par ${actorName}` : 'Action annulée avec succès';
-    showToast(msg, 'success');
+    await apiCall(`/api/history/${actionId}/undo`, { method: 'POST' });
+    showToast('Action annulée avec succès', 'success');
     await loadAllData();
   } catch (err) {
     showToast(err.message || 'Impossible d\'annuler cette action', 'error');
   }
 }
 
-async function triggerReinstate(actionId, actorName) {
+async function triggerReinstate(actionId) {
   try {
-    const payload = actorName ? { reinstated_by: actorName } : {};
-    await apiCall(`/api/history/${actionId}/reinstate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const msg = actorName ? `Action rétablie par ${actorName}` : 'Action rétablie avec succès';
-    showToast(msg, 'success');
+    await apiCall(`/api/history/${actionId}/reinstate`, { method: 'POST' });
+    showToast('Action rétablie avec succès', 'success');
     await loadAllData();
   } catch (err) {
     showToast(err.message || 'Impossible de rétablir cette action', 'error');
