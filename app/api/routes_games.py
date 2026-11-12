@@ -4,7 +4,7 @@ import uuid
 import urllib.request
 import urllib.parse
 import re
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import Response, RedirectResponse
 from app.api.schemas import GameCreateRequest, GameResponse, GameUpdateImageRequest, GameUpdateNameRequest
@@ -32,6 +32,7 @@ def list_games(
             id=g.id,
             name=g.name,
             image_url=g.image_url,
+            original_image_url=g.original_image_url,
             created_by_action_id=g.created_by_action_id,
             is_active=g.is_active,
             created_at=g.created_at,
@@ -52,11 +53,16 @@ def create_game(
         if not is_valid_image_url(req.image_url):
             raise HTTPException(status_code=400, detail="Lien d'image invalide ou format non supporté.")
     try:
-        game = game_service.create_game(name=req.name, image_url=req.image_url)
+        game = game_service.create_game(
+            name=req.name,
+            image_url=req.image_url,
+            original_image_url=req.original_image_url,
+        )
         return GameResponse(
             id=game.id,
             name=game.name,
             image_url=game.image_url,
+            original_image_url=game.original_image_url,
             created_by_action_id=game.created_by_action_id,
             is_active=game.is_active,
             created_at=game.created_at,
@@ -80,6 +86,7 @@ def update_game_name(
             id=game.id,
             name=game.name,
             image_url=game.image_url,
+            original_image_url=game.original_image_url,
             created_by_action_id=game.created_by_action_id,
             is_active=game.is_active,
             created_at=game.created_at,
@@ -100,12 +107,18 @@ def update_game_image(
     if not is_valid_image_url(req.image_url):
         raise HTTPException(status_code=400, detail="Lien d'image invalide ou format non supporté.")
     try:
-        game = game_service.update_game_image(game_id, req.image_url)
+        game = game_service.update_game_image(
+            game_id,
+            req.image_url,
+            original_image_url=req.original_image_url,
+            update_original=True if req.original_image_url is not None else False,
+        )
         match_counts = match_repo.get_game_match_counts()
         return GameResponse(
             id=game.id,
             name=game.name,
             image_url=game.image_url,
+            original_image_url=game.original_image_url,
             created_by_action_id=game.created_by_action_id,
             is_active=game.is_active,
             created_at=game.created_at,
@@ -116,8 +129,11 @@ def update_game_image(
 
 
 @router.post("/upload-image")
-async def upload_game_image(file: UploadFile = File(...)):
-    """Uploads an image file for a game and returns its public URL."""
+async def upload_game_image(
+    file: UploadFile = File(...),
+    original_file: Optional[UploadFile] = File(None),
+):
+    """Uploads an image file for a game (and optionally its original uncropped version) and returns public URLs."""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -130,14 +146,25 @@ async def upload_game_image(file: UploadFile = File(...)):
     dest_path = os.path.join(UPLOAD_DIR, filename)
 
     content = await file.read()
-    # 5MB limit
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="L'image ne doit pas dépasser 5 Mo.")
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="L'image ne doit pas dépasser 10 Mo.")
 
     with open(dest_path, "wb") as f:
         f.write(content)
 
-    return {"url": f"/uploads/{filename}", "filename": filename}
+    orig_url = None
+    if original_file is not None and original_file.filename:
+        orig_ext = os.path.splitext(original_file.filename or "")[1].lower()
+        if orig_ext in ALLOWED_EXTENSIONS:
+            orig_filename = f"orig_{uuid.uuid4()}{orig_ext}"
+            orig_dest = os.path.join(UPLOAD_DIR, orig_filename)
+            orig_content = await original_file.read()
+            if len(orig_content) <= 20 * 1024 * 1024:  # up to 20MB for raw photo
+                with open(orig_dest, "wb") as f_orig:
+                    f_orig.write(orig_content)
+                orig_url = f"/uploads/{orig_filename}"
+
+    return {"url": f"/uploads/{filename}", "original_url": orig_url, "filename": filename}
 
 
 @router.get("/search-cover")
@@ -216,6 +243,7 @@ def get_game(
         id=game.id,
         name=game.name,
         image_url=game.image_url,
+        original_image_url=game.original_image_url,
         created_by_action_id=game.created_by_action_id,
         is_active=game.is_active,
         created_at=game.created_at,

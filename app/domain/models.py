@@ -40,6 +40,7 @@ class Player:
     name: str
     created_by_action_id: str
     image_url: Optional[str] = None
+    original_image_url: Optional[str] = None
     is_active: bool = True
     created_at: Optional[str] = None
 
@@ -50,6 +51,7 @@ class Game:
     name: str
     image_url: str
     created_by_action_id: str
+    original_image_url: Optional[str] = None
     is_active: bool = True
     created_at: Optional[str] = None
 

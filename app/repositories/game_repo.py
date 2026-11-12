@@ -10,11 +10,12 @@ class GameRepository:
 
     def save_game(self, game: Game) -> None:
         query = """
-        INSERT INTO games (id, name, image_url, created_by_action_id, is_active, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO games (id, name, image_url, original_image_url, created_by_action_id, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name=excluded.name,
             image_url=excluded.image_url,
+            original_image_url=excluded.original_image_url,
             is_active=excluded.is_active
         """
         with self.conn:
@@ -24,6 +25,7 @@ class GameRepository:
                     game.id,
                     game.name,
                     game.image_url,
+                    game.original_image_url,
                     game.created_by_action_id,
                     1 if game.is_active else 0,
                     game.created_at,
@@ -68,18 +70,43 @@ class GameRepository:
                 (new_name.strip(), game_id),
             )
 
-    def update_game_image(self, game_id: str, image_url: str) -> None:
+    def update_game_image(
+        self,
+        game_id: str,
+        image_url: str,
+        original_image_url: Optional[str] = None,
+        update_original: bool = False,
+    ) -> None:
         with self.conn:
-            self.conn.execute(
-                "UPDATE games SET image_url = ? WHERE id = ?",
-                (image_url.strip(), game_id),
-            )
+            cleaned_img = image_url.strip()
+            cleaned_orig = original_image_url.strip() if original_image_url else None
+            # If default icon is restored, clear original_image_url
+            is_default = (cleaned_img == "/static/icons/default-game.svg")
+            if is_default:
+                self.conn.execute(
+                    "UPDATE games SET image_url = ?, original_image_url = NULL WHERE id = ?",
+                    (cleaned_img, game_id),
+                )
+            elif update_original:
+                self.conn.execute(
+                    "UPDATE games SET image_url = ?, original_image_url = ? WHERE id = ?",
+                    (cleaned_img, cleaned_orig, game_id),
+                )
+            else:
+                self.conn.execute(
+                    "UPDATE games SET image_url = ? WHERE id = ?",
+                    (cleaned_img, game_id),
+                )
 
     def _row_to_game(self, row: sqlite3.Row) -> Game:
+        original_image_url = None
+        if "original_image_url" in row.keys():
+            original_image_url = row["original_image_url"]
         return Game(
             id=row["id"],
             name=row["name"],
             image_url=row["image_url"],
+            original_image_url=original_image_url,
             created_by_action_id=row["created_by_action_id"],
             is_active=bool(row["is_active"]),
             created_at=row["created_at"],

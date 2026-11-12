@@ -30,6 +30,7 @@ def list_players(
             id=p.id,
             name=p.name,
             image_url=p.image_url,
+            original_image_url=p.original_image_url,
             created_by_action_id=p.created_by_action_id,
             is_active=p.is_active,
             created_at=p.created_at,
@@ -46,11 +47,16 @@ def create_player(
     if req.image_url and not is_valid_image_url(req.image_url):
         raise HTTPException(status_code=400, detail="Lien d'image invalide ou format non supporté.")
     try:
-        player = player_service.create_player(name=req.name, image_url=req.image_url)
+        player = player_service.create_player(
+            name=req.name,
+            image_url=req.image_url,
+            original_image_url=req.original_image_url,
+        )
         return PlayerResponse(
             id=player.id,
             name=player.name,
             image_url=player.image_url,
+            original_image_url=player.original_image_url,
             created_by_action_id=player.created_by_action_id,
             is_active=player.is_active,
             created_at=player.created_at,
@@ -60,8 +66,11 @@ def create_player(
 
 
 @router.post("/upload-image")
-async def upload_player_image(file: UploadFile = File(...)):
-    """Uploads an avatar/photo file for a player and returns its public URL."""
+async def upload_player_image(
+    file: UploadFile = File(...),
+    original_file: Optional[UploadFile] = File(None),
+):
+    """Uploads an avatar/photo file for a player (and optionally its original uncropped version) and returns public URLs."""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -74,13 +83,25 @@ async def upload_player_image(file: UploadFile = File(...)):
     dest_path = os.path.join(UPLOAD_DIR, filename)
 
     content = await file.read()
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="L'image ne doit pas dépasser 5 Mo.")
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="L'image ne doit pas dépasser 10 Mo.")
 
     with open(dest_path, "wb") as f:
         f.write(content)
 
-    return {"url": f"/uploads/{filename}", "filename": filename}
+    orig_url = None
+    if original_file is not None and original_file.filename:
+        orig_ext = os.path.splitext(original_file.filename or "")[1].lower()
+        if orig_ext in ALLOWED_EXTENSIONS:
+            orig_filename = f"orig_player_{uuid.uuid4()}{orig_ext}"
+            orig_dest = os.path.join(UPLOAD_DIR, orig_filename)
+            orig_content = await original_file.read()
+            if len(orig_content) <= 20 * 1024 * 1024:  # up to 20MB for raw photo
+                with open(orig_dest, "wb") as f_orig:
+                    f_orig.write(orig_content)
+                orig_url = f"/uploads/{orig_filename}"
+
+    return {"url": f"/uploads/{filename}", "original_url": orig_url, "filename": filename}
 
 
 @router.patch("/{player_id}/name", response_model=PlayerResponse)
@@ -95,6 +116,7 @@ def update_player_name(
             id=player.id,
             name=player.name,
             image_url=player.image_url,
+            original_image_url=player.original_image_url,
             created_by_action_id=player.created_by_action_id,
             is_active=player.is_active,
             created_at=player.created_at,
@@ -112,11 +134,17 @@ def update_player_image(
     if req.image_url and not is_valid_image_url(req.image_url):
         raise HTTPException(status_code=400, detail="Lien d'image invalide ou format non supporté.")
     try:
-        player = player_service.update_player_image(player_id, req.image_url)
+        player = player_service.update_player_image(
+            player_id,
+            req.image_url,
+            original_image_url=req.original_image_url,
+            update_original=True if req.original_image_url is not None else False,
+        )
         return PlayerResponse(
             id=player.id,
             name=player.name,
             image_url=player.image_url,
+            original_image_url=player.original_image_url,
             created_by_action_id=player.created_by_action_id,
             is_active=player.is_active,
             created_at=player.created_at,
@@ -133,6 +161,15 @@ def get_player(
     player = player_service.get_player(player_id)
     if not player:
         raise HTTPException(status_code=404, detail="Joueur introuvable")
+    return PlayerResponse(
+        id=player.id,
+        name=player.name,
+        image_url=player.image_url,
+        original_image_url=player.original_image_url,
+        created_by_action_id=player.created_by_action_id,
+        is_active=player.is_active,
+        created_at=player.created_at,
+    )
     return PlayerResponse(
         id=player.id,
         name=player.name,

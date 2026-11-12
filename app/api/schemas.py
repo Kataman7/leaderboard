@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class PlayerCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
     image_url: Optional[str] = None
+    original_image_url: Optional[str] = None
 
 
 class PlayerUpdateNameRequest(BaseModel):
@@ -15,12 +16,14 @@ class PlayerUpdateNameRequest(BaseModel):
 
 class PlayerUpdateImageRequest(BaseModel):
     image_url: Optional[str] = None
+    original_image_url: Optional[str] = None
 
 
 class PlayerResponse(BaseModel):
     id: str
     name: str
     image_url: Optional[str] = None
+    original_image_url: Optional[str] = None
     created_by_action_id: str
     is_active: bool
     created_at: Optional[str] = None
@@ -30,6 +33,7 @@ class PlayerResponse(BaseModel):
 class GameCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     image_url: Optional[str] = None
+    original_image_url: Optional[str] = None
 
 
 class GameUpdateNameRequest(BaseModel):
@@ -38,12 +42,14 @@ class GameUpdateNameRequest(BaseModel):
 
 class GameUpdateImageRequest(BaseModel):
     image_url: str = Field(..., min_length=1)
+    original_image_url: Optional[str] = None
 
 
 class GameResponse(BaseModel):
     id: str
     name: str
     image_url: str
+    original_image_url: Optional[str] = None
     created_by_action_id: str
     is_active: bool
     created_at: Optional[str] = None

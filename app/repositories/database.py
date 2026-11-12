@@ -46,6 +46,7 @@ def init_db(db_path: Optional[str] = None) -> None:
                     id TEXT PRIMARY KEY,
                     name TEXT UNIQUE NOT NULL COLLATE NOCASE,
                     image_url TEXT,
+                    original_image_url TEXT,
                     created_by_action_id TEXT NOT NULL,
                     is_active INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
@@ -56,6 +57,7 @@ def init_db(db_path: Optional[str] = None) -> None:
                     id TEXT PRIMARY KEY,
                     name TEXT UNIQUE NOT NULL COLLATE NOCASE,
                     image_url TEXT NOT NULL,
+                    original_image_url TEXT,
                     created_by_action_id TEXT NOT NULL,
                     is_active INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
@@ -100,5 +102,11 @@ def init_db(db_path: Optional[str] = None) -> None:
             player_cols = [r[1] for r in conn.execute("PRAGMA table_info(players)").fetchall()]
             if "image_url" not in player_cols:
                 conn.execute("ALTER TABLE players ADD COLUMN image_url TEXT DEFAULT NULL;")
+            if "original_image_url" not in player_cols:
+                conn.execute("ALTER TABLE players ADD COLUMN original_image_url TEXT DEFAULT NULL;")
+
+            game_cols = [r[1] for r in conn.execute("PRAGMA table_info(games)").fetchall()]
+            if "original_image_url" not in game_cols:
+                conn.execute("ALTER TABLE games ADD COLUMN original_image_url TEXT DEFAULT NULL;")
     finally:
         conn.close()

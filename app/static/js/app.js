@@ -2184,10 +2184,14 @@ async function submitInlineGame(e, context) {
   }
 
   let imageUrl = null;
+  let originalImageUrl = null;
   try {
     if (state.pendingGameUploadFile) {
       const formData = new FormData();
       formData.append('file', state.pendingGameUploadFile);
+      if (state._lastOriginalGameFile instanceof File || state._lastOriginalGameFile instanceof Blob) {
+        formData.append('original_file', state._lastOriginalGameFile);
+      }
       const uploadRes = await fetch('/api/games/upload-image', {
         method: 'POST',
         body: formData,
@@ -2195,16 +2199,18 @@ async function submitInlineGame(e, context) {
       if (!uploadRes.ok) throw new Error('Échec du téléversement de l\'image');
       const uploadData = await uploadRes.json();
       imageUrl = uploadData.url;
+      originalImageUrl = uploadData.original_url || (typeof state._lastOriginalGameFile === 'string' ? state._lastOriginalGameFile : null);
     }
 
     const newGame = await apiCall('/api/games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, image_url: imageUrl }),
+      body: JSON.stringify({ name, image_url: imageUrl, original_image_url: originalImageUrl }),
     });
 
     state.games.push(newGame);
     state.pendingGameUploadFile = null;
+    state._lastOriginalGameFile = null;
     showToast(`Jeu '${newGame.name}' ajouté !`, 'success');
     await loadGames();
     await loadHistory();
@@ -2445,8 +2451,8 @@ async function autoFindCoverForExistingGame(gameId) {
         source: data.image_url,
         mode: 'square',
         title: `Boîte : ${game.name}`,
-        onComplete: async (croppedFile) => {
-          await saveGuidedCroppedImage('game', game.id, croppedFile);
+        onComplete: async (croppedFile, dataUrl, originalSource) => {
+          await saveGuidedCroppedImage('game', game.id, croppedFile, data.image_url);
         },
       });
     } else {
@@ -2536,8 +2542,8 @@ function onGuidedFileChosen(input, type, id) {
       source: file,
       mode: type === 'player' ? 'circle' : 'square',
       title: type === 'player' ? "Recadrer la photo" : "Recadrer l'image du jeu",
-      onComplete: async (croppedFile) => {
-        await saveGuidedCroppedImage(type, id, croppedFile);
+      onComplete: async (croppedFile, dataUrl, originalSource) => {
+        await saveGuidedCroppedImage(type, id, croppedFile, file);
       }
     });
   }
@@ -2547,12 +2553,13 @@ function cropExistingGameImage(gameId) {
   const game = state.games.find(g => g.id === gameId);
   if (!game || !game.image_url) return;
 
+  const source = game.original_image_url || game.image_url;
   openImageCropper({
-    source: game.image_url,
+    source: source,
     mode: 'square',
     title: "Recadrer l'image du jeu",
-    onComplete: async (croppedFile) => {
-      await saveGuidedCroppedImage('game', gameId, croppedFile);
+    onComplete: async (croppedFile, dataUrl, originalSource) => {
+      await saveGuidedCroppedImage('game', gameId, croppedFile, game.original_image_url || source);
     }
   });
 }
@@ -2561,21 +2568,25 @@ function cropExistingPlayerImage(playerId) {
   const player = state.players.find(p => p.id === playerId);
   if (!player || !player.image_url) return;
 
+  const source = player.original_image_url || player.image_url;
   openImageCropper({
-    source: player.image_url,
+    source: source,
     mode: 'circle',
     title: "Recadrer la photo",
-    onComplete: async (croppedFile) => {
-      await saveGuidedCroppedImage('player', playerId, croppedFile);
+    onComplete: async (croppedFile, dataUrl, originalSource) => {
+      await saveGuidedCroppedImage('player', playerId, croppedFile, player.original_image_url || source);
     }
   });
 }
 
-async function saveGuidedCroppedImage(type, id, croppedFile) {
+async function saveGuidedCroppedImage(type, id, croppedFile, originalSource) {
   try {
     showToast("Enregistrement de l'image...", 'info');
     const formData = new FormData();
     formData.append('file', croppedFile);
+    if (originalSource instanceof File || originalSource instanceof Blob) {
+      formData.append('original_file', originalSource);
+    }
     const uploadUrl = type === 'player' ? '/api/players/upload-image' : '/api/games/upload-image';
     const uploadRes = await fetch(uploadUrl, {
       method: 'POST',
@@ -2586,11 +2597,22 @@ async function saveGuidedCroppedImage(type, id, croppedFile) {
       throw new Error(err.detail || 'Échec du téléversement');
     }
     const uploadData = await uploadRes.json();
+
+    let finalOriginalUrl = uploadData.original_url;
+    if (!finalOriginalUrl && typeof originalSource === 'string') {
+      finalOriginalUrl = originalSource;
+    }
+
     const updateUrl = type === 'player' ? `/api/players/${id}/image` : `/api/games/${id}/image`;
+    const payload = { image_url: uploadData.url };
+    if (finalOriginalUrl) {
+      payload.original_image_url = finalOriginalUrl;
+    }
+
     await apiCall(updateUrl, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: uploadData.url }),
+      body: JSON.stringify(payload),
     });
 
     closeAppModal();
@@ -2612,7 +2634,7 @@ async function deleteGameImage(gameId) {
     await apiCall(`/api/games/${gameId}/image`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: '/static/icons/default-game.svg' }),
+      body: JSON.stringify({ image_url: '/static/icons/default-game.svg', original_image_url: null }),
     });
     closeAppModal();
     showToast("Image du jeu réinitialisée", 'info');
@@ -2629,7 +2651,7 @@ async function deletePlayerImage(playerId) {
     await apiCall(`/api/players/${playerId}/image`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: null }),
+      body: JSON.stringify({ image_url: null, original_image_url: null }),
     });
     closeAppModal();
     showToast('Photo de profil supprimée', 'info');
@@ -2875,9 +2897,11 @@ function handleLongPressAction(action, id) {
 // Modal 5: Create Player with optional photo
 // ------------------------------------------
 let _createPlayerPendingFile = null;
+let _createPlayerPendingOriginalFile = null;
 
 function openCreatePlayerModal(context = 'playersView', prefillName = '') {
   _createPlayerPendingFile = null;
+  _createPlayerPendingOriginalFile = null;
 
   const prefillVal = prefillName ? escapeHtml(prefillName) : '';
   const modalHtml = `
@@ -2897,7 +2921,7 @@ function openCreatePlayerModal(context = 'playersView', prefillName = '') {
           <input type="file" id="createPlayerFileInput" accept="image/*" class="custom-input" onchange="onCreatePlayerFileChange(this)">
 
           <div id="createPlayerPreviewWrap" style="margin-top:10px; text-align:center;">
-            <img id="createPlayerPreviewImg" src="" alt="Aperçu" style="max-height:80px; border-radius:50%; width:80px; height:80px; object-fit:cover; display:none; margin:0 auto; border:1px solid var(--border);">
+            <img id="createPlayerPreviewImg" src="" alt="Aperçu" style="max-height:80px; border-radius:50%; width:80px; height:80px; object-fit:cover; display:none; margin:0 auto; border:1px solid var(--border); cursor:pointer;" onclick="reopenPlayerCropper()" title="Cliquer pour ajuster le recadrage">
           </div>
         </div>
       </div>
@@ -2911,9 +2935,28 @@ function openCreatePlayerModal(context = 'playersView', prefillName = '') {
   setTimeout(() => document.getElementById('createPlayerNameInput')?.focus(), 100);
 }
 
+function reopenPlayerCropper() {
+  const source = _createPlayerPendingOriginalFile || _createPlayerPendingFile;
+  if (!source) return;
+  openImageCropper({
+    source: source,
+    mode: 'circle',
+    title: "Recadrer la photo du joueur",
+    onComplete: (croppedFile, dataUrl) => {
+      _createPlayerPendingFile = croppedFile;
+      const img = document.getElementById('createPlayerPreviewImg');
+      if (img) {
+        img.src = dataUrl;
+        img.style.display = 'block';
+      }
+    },
+  });
+}
+
 function onCreatePlayerFileChange(input) {
   if (input.files && input.files[0]) {
     const file = input.files[0];
+    _createPlayerPendingOriginalFile = file;
     openImageCropper({
       source: file,
       mode: 'circle',
@@ -2928,6 +2971,7 @@ function onCreatePlayerFileChange(input) {
       },
       onCancel: () => {
         if (!_createPlayerPendingFile) {
+          _createPlayerPendingOriginalFile = null;
           const img = document.getElementById('createPlayerPreviewImg');
           if (img) img.style.display = 'none';
         }
@@ -2935,6 +2979,7 @@ function onCreatePlayerFileChange(input) {
     });
   } else {
     _createPlayerPendingFile = null;
+    _createPlayerPendingOriginalFile = null;
   }
 }
 
@@ -2948,9 +2993,13 @@ async function submitCreatePlayerWithPhoto(e, context) {
 
   try {
     let finalImageUrl = null;
+    let finalOriginalUrl = null;
     if (_createPlayerPendingFile) {
       const formData = new FormData();
       formData.append('file', _createPlayerPendingFile);
+      if (_createPlayerPendingOriginalFile instanceof File || _createPlayerPendingOriginalFile instanceof Blob) {
+        formData.append('original_file', _createPlayerPendingOriginalFile);
+      }
       const uploadRes = await fetch('/api/players/upload-image', {
         method: 'POST',
         body: formData,
@@ -2958,12 +3007,17 @@ async function submitCreatePlayerWithPhoto(e, context) {
       if (!uploadRes.ok) throw new Error('Échec du téléversement de la photo');
       const data = await uploadRes.json();
       finalImageUrl = data.url;
+      finalOriginalUrl = data.original_url;
     }
 
     const newPlayer = await apiCall('/api/players', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, image_url: finalImageUrl }),
+      body: JSON.stringify({
+        name,
+        image_url: finalImageUrl,
+        original_image_url: finalOriginalUrl,
+      }),
     });
 
     state.players.push(newPlayer);
@@ -3217,7 +3271,7 @@ function openImageCropper(options) {
 }
 
 function cropperZoomStep(delta) {
-  const newZoom = Math.max(1, Math.min(4, cropperState.zoomFactor + delta));
+  const newZoom = Math.max(0.5, Math.min(4, cropperState.zoomFactor + delta));
   cropperState.zoomFactor = Math.round(newZoom * 100) / 100;
   clampCropperBounds();
   updateCropperTransform();
@@ -3301,10 +3355,11 @@ function applyImageCrop() {
       const file = new File([blob], filename, { type: 'image/jpeg' });
 
       const onComplete = cropperState.onComplete;
+      const originalSource = cropperState.source;
       closeImageCropper();
 
       if (onComplete) {
-        onComplete(file, dataUrl);
+        onComplete(file, dataUrl, originalSource);
       }
     }, 'image/jpeg', 0.92);
   } catch (err) {
