@@ -150,3 +150,56 @@ def test_match_list_batch_scores_and_indexes(client: TestClient):
         assert isinstance(m["scores"], list)
 
 
+def test_seasons_endpoints_and_filtering(client: TestClient):
+    # Create player and game
+    p1 = client.post("/api/players", json={"name": "SeasonP1"}).json()
+    p2 = client.post("/api/players", json={"name": "SeasonP2"}).json()
+    g1 = client.post("/api/games", json={"name": "SeasonGame"}).json()
+
+    # Match in Q1 2026 (February)
+    client.post("/api/matches", json={
+        "game_id": g1["id"],
+        "played_at": "2026-02-10T14:00:00Z",
+        "scores": [
+            {"player_id": p1["id"], "score": 10, "is_winner": True},
+            {"player_id": p2["id"], "score": 2, "is_winner": False},
+        ]
+    })
+
+    # Test /api/seasons
+    res_seasons = client.get("/api/seasons")
+    assert res_seasons.status_code == 200
+    seasons = res_seasons.json()
+    assert len(seasons) >= 1
+    t1_season = next((s for s in seasons if s["id"] == "2026-T1"), None)
+    assert t1_season is not None
+    assert t1_season["matches_count"] >= 1
+
+    # Verify no parentheses anywhere in seasons response
+    def verify_no_parentheses(val):
+        if isinstance(val, str):
+            assert "(" not in val and ")" not in val, f"Found parentheses in: {val}"
+        elif isinstance(val, list):
+            for item in val:
+                verify_no_parentheses(item)
+        elif isinstance(val, dict):
+            for v in val.values():
+                verify_no_parentheses(v)
+
+    verify_no_parentheses(seasons)
+
+    # Test /api/seasons/current
+    res_curr = client.get("/api/seasons/current")
+    assert res_curr.status_code == 200
+    assert res_curr.json()["is_current"] is True
+
+    # Test /api/leaderboard?season=2026-T1
+    res_lb_t1 = client.get("/api/leaderboard?season=2026-T1")
+    assert res_lb_t1.status_code == 200
+    lb_t1 = res_lb_t1.json()
+    p1_entry = next((e for e in lb_t1 if e["player_id"] == p1["id"]), None)
+    assert p1_entry is not None
+    assert p1_entry["matches_won"] >= 1
+
+
+

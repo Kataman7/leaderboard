@@ -145,3 +145,79 @@ class SessionResponse(BaseModel):
     game_names: List[str]
     player_ids: List[str]
     match_ids: List[str]
+
+
+# --- Seasons ---
+class SeasonMVP(BaseModel):
+    player_id: str
+    player_name: str
+    player_image_url: Optional[str] = None
+    matches_won: int
+
+
+class SeasonTopGame(BaseModel):
+    id: Optional[str] = None
+    name: str
+    image_url: str
+    matches_count: int
+
+
+class SeasonStreak(BaseModel):
+    player_name: str
+    streak: int
+
+
+class SeasonBestScore(BaseModel):
+    player_id: str
+    player_name: str
+    game_name: str
+    score: float
+
+
+class SeasonRivalry(BaseModel):
+    p1_name: str
+    p2_name: str
+    matches_together: int
+    p1_wins: int
+    p2_wins: int
+
+
+class SeasonGameItem(BaseModel):
+    id: Optional[str] = None
+    name: str
+    image_url: str
+    matches_count: int
+
+
+class SeasonLeaderboardEntry(BaseModel):
+    rank: int
+    player_id: str
+    player_name: str
+    player_image_url: Optional[str] = None
+    matches_played: int
+    matches_won: int
+    win_ratio: float
+    win_percentage: int
+    score: float
+    opponents_defeated: int
+    opponents_faced: int
+
+
+class SeasonResponse(BaseModel):
+    id: str
+    name: str
+    short_name: str
+    is_current: bool
+    start_time: str
+    end_time: str
+    date_range_str: str
+    matches_count: int
+    players_count: int
+    games_count: int
+    mvp: Optional[SeasonMVP] = None
+    top_game: Optional[SeasonTopGame] = None
+    win_streak: Optional[SeasonStreak] = None
+    best_score: Optional[SeasonBestScore] = None
+    rivalry: Optional[SeasonRivalry] = None
+    leaderboard: List[SeasonLeaderboardEntry] = []
+    games: List[SeasonGameItem] = []

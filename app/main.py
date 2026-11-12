@@ -12,6 +12,7 @@ from app.api.routes_games import router as games_router
 from app.api.routes_matches import router as matches_router
 from app.api.routes_history import router as history_router
 from app.api.routes_leaderboard import router as leaderboard_router
+from app.api.routes_seasons import router as seasons_router
 
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "data/uploads")
@@ -60,6 +61,7 @@ app.include_router(games_router)
 app.include_router(matches_router)
 app.include_router(history_router)
 app.include_router(leaderboard_router)
+app.include_router(seasons_router)
 
 # Mount uploads static directory
 os.makedirs(UPLOAD_DIR, exist_ok=True)

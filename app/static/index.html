@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
 
-  <link rel="stylesheet" href="/static/css/style.css?v=3.6">
+  <link rel="stylesheet" href="/static/css/style.css?v=3.7">
 </head>
 <body>
 
@@ -47,13 +47,27 @@
       <div class="section-header">
         <div>
           <h1 class="section-title">Classement</h1>
-          <p class="section-subtitle" id="lbSubtitle">Basé sur les adversaires battus</p>
+          <p class="section-subtitle" id="lbSubtitle">Saison en cours • Basé sur les adversaires battus</p>
         </div>
         <div class="lb-sort-toggle" role="group" aria-label="Trier le classement">
           <button type="button" class="lb-sort-btn active" id="btnSortScore" onclick="setLeaderboardSort('score')">Score</button>
           <button type="button" class="lb-sort-btn" id="btnSortRatio" onclick="setLeaderboardSort('ratio')">Ratio</button>
           <button type="button" class="lb-sort-btn" id="btnSortWins" onclick="setLeaderboardSort('wins')">Wins</button>
         </div>
+      </div>
+
+      <!-- Leaderboard Period Bar: Saison en cours vs Général -->
+      <div class="lb-period-bar">
+        <div class="lb-period-toggle" role="group" aria-label="Période du classement">
+          <button type="button" class="lb-period-btn active" id="btnPeriodSeason" onclick="setLeaderboardPeriod('season')">
+            <span class="period-dot">●</span>
+            <span>Saison en cours</span>
+          </button>
+          <button type="button" class="lb-period-btn" id="btnPeriodAll" onclick="setLeaderboardPeriod('all')">
+            <span>Général</span>
+          </button>
+        </div>
+        <div id="lbSeasonInfoBadge" class="lb-season-info-badge" style="display: none;"></div>
       </div>
 
       <!-- Leaderboard Filter Category Bar (Toujours ouvert) -->
@@ -97,6 +111,7 @@
         </div>
         <div class="lb-sort-toggle" role="group" aria-label="Mode d'historique">
           <button type="button" class="lb-sort-btn active" id="btnHistModeSessions" onclick="setHistoryMode('sessions')">Sessions</button>
+          <button type="button" class="lb-sort-btn" id="btnHistModeSeasons" onclick="setHistoryMode('seasons')">Saisons</button>
           <button type="button" class="lb-sort-btn" id="btnHistModeGlobal" onclick="setHistoryMode('global')">Global</button>
         </div>
       </div>
@@ -104,6 +119,13 @@
       <!-- Sessions History Section (Default) -->
       <div id="historySessionsSection">
         <div id="historySessionsList" class="sessions-history-list">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Seasons History Section -->
+      <div id="historySeasonsSection" style="display: none;">
+        <div id="historySeasonsList" class="seasons-history-list">
           <!-- Rendered dynamically -->
         </div>
       </div>
@@ -525,6 +547,6 @@
     </div>
   </div>
 
-  <script src="/static/js/app.js?v=4.7"></script>
+  <script src="/static/js/app.js?v=4.8"></script>
 </body>
 </html>

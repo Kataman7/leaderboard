@@ -35,7 +35,9 @@ const state = {
   currentView: 'leaderboard',
   previousView: 'leaderboard',
   filterCategory: 'games', // 'games' | 'players' | 'sessions'
-  historyMode: 'sessions', // 'sessions' (default) | 'global'
+  historyMode: 'sessions', // 'sessions' (default) | 'seasons' | 'global'
+  leaderboardPeriod: 'season', // 'season' (default) | 'all'
+  selectedSeasonId: 'current', // 'current' or specific season id
   selectedLbGameId: null, // null for global, or game_id
   selectedLbPlayerId: null, // null or player_id
   selectedLbSessionId: null, // null or session_id
@@ -43,6 +45,8 @@ const state = {
   players: [],
   games: [],
   sessions: [],
+  seasons: [],
+  expandedSeasonIds: new Set(),
   history: [],
   leaderboard: [],
 
@@ -238,6 +242,7 @@ async function loadAllData() {
       loadPlayers(),
       loadGames(),
       loadSessions(),
+      loadSeasons(),
       loadLeaderboard(),
       loadHistory(),
     ]);
@@ -258,6 +263,19 @@ async function loadSessions() {
     }
   } catch (err) {
     console.warn('Erreur chargement sessions:', err);
+  }
+}
+
+async function loadSeasons() {
+  try {
+    const data = await apiCall('/api/seasons');
+    state.seasons = data;
+    updateSeasonInfoBadge();
+    if (state.currentView === 'history' && state.historyMode === 'seasons') {
+      renderHistorySeasons();
+    }
+  } catch (err) {
+    console.warn('Erreur chargement saisons:', err);
   }
 }
 
@@ -289,11 +307,94 @@ async function loadLeaderboard() {
   else if (state.selectedLbPlayerId) params.set('player_id', state.selectedLbPlayerId);
   else if (state.selectedLbSessionId) params.set('session_id', state.selectedLbSessionId);
 
+  if (state.leaderboardPeriod === 'season') {
+    params.set('season', state.selectedSeasonId || 'current');
+  }
+
   const qs = params.toString() ? `?${params.toString()}` : '';
   const data = await apiCall(`/api/leaderboard${qs}`);
   state.leaderboard = data;
   updateFilterBarState();
   renderLeaderboard();
+  updateSeasonInfoBadge();
+}
+
+function setLeaderboardPeriod(period, seasonId = null) {
+  state.leaderboardPeriod = period;
+  if (seasonId) {
+    state.selectedSeasonId = seasonId;
+  } else if (period === 'season' && (!state.selectedSeasonId || state.selectedSeasonId === 'null')) {
+    state.selectedSeasonId = 'current';
+  } else if (period === 'all') {
+    state.selectedSeasonId = null;
+  }
+
+  const btnSeason = document.getElementById('btnPeriodSeason');
+  const btnAll = document.getElementById('btnPeriodAll');
+  if (btnSeason && btnAll) {
+    btnSeason.classList.toggle('active', period === 'season');
+    btnAll.classList.toggle('active', period === 'all');
+  }
+
+  const lbSubtitle = document.getElementById('lbSubtitle');
+  if (lbSubtitle) {
+    if (period === 'season') {
+      lbSubtitle.textContent = 'Saison en cours • Basé sur les adversaires battus';
+    } else {
+      lbSubtitle.textContent = 'Général all time • Basé sur les adversaires battus';
+    }
+  }
+
+  updateSeasonInfoBadge();
+  loadLeaderboard();
+}
+
+function updateSeasonInfoBadge() {
+  const badgeEl = document.getElementById('lbSeasonInfoBadge');
+  if (!badgeEl) return;
+  if (state.leaderboardPeriod !== 'season') {
+    badgeEl.style.display = 'none';
+    badgeEl.innerHTML = '';
+    return;
+  }
+  let s = null;
+  if (state.seasons && state.seasons.length > 0) {
+    if (state.selectedSeasonId && state.selectedSeasonId !== 'current') {
+      s = state.seasons.find(item => item.id.toLowerCase() === state.selectedSeasonId.toLowerCase());
+    }
+    if (!s) {
+      s = state.seasons.find(item => item.is_current) || state.seasons[0];
+    }
+  }
+  if (s) {
+    badgeEl.style.display = 'inline-flex';
+    badgeEl.innerHTML = `<span class="period-dot">●</span> <span>${escapeHtml(s.short_name)} • ${escapeHtml(s.date_range_str)}</span>`;
+  } else {
+    badgeEl.style.display = 'none';
+  }
+}
+
+function viewSeasonLeaderboard(seasonId) {
+  state.leaderboardPeriod = 'season';
+  state.selectedSeasonId = seasonId;
+  state.selectedLbSessionId = null;
+
+  switchView('leaderboard');
+
+  const btnSeason = document.getElementById('btnPeriodSeason');
+  const btnAll = document.getElementById('btnPeriodAll');
+  if (btnSeason && btnAll) {
+    btnSeason.classList.add('active');
+    btnAll.classList.remove('active');
+  }
+
+  const lbSubtitle = document.getElementById('lbSubtitle');
+  if (lbSubtitle) {
+    lbSubtitle.textContent = 'Saison en cours • Basé sur les adversaires battus';
+  }
+
+  updateSeasonInfoBadge();
+  loadLeaderboard();
 }
 
 async function loadHistory() {
@@ -338,13 +439,16 @@ function switchView(viewName) {
     if (state.leaderboard && state.leaderboard.length) renderLeaderboard();
     loadLeaderboard();
   } else if (viewName === 'history') {
-    if (state.historyMode === 'sessions' && state.sessions && state.sessions.length) {
+    if (state.historyMode === 'seasons' && state.seasons && state.seasons.length) {
+      renderHistorySeasons();
+    } else if (state.historyMode === 'sessions' && state.sessions && state.sessions.length) {
       renderHistorySessions();
     } else if (state.history && state.history.length) {
       renderHistory();
     }
     loadHistory();
     loadSessions();
+    loadSeasons();
   } else if (viewName === 'games') {
     if (state.games && state.games.length) renderGames();
     loadGames();
@@ -1391,31 +1495,211 @@ function setHistoryMode(mode) {
   state.historyMode = mode;
   const btnGlobal = document.getElementById('btnHistModeGlobal');
   const btnSessions = document.getElementById('btnHistModeSessions');
+  const btnSeasons = document.getElementById('btnHistModeSeasons');
   const globalSection = document.getElementById('historyGlobalSection');
   const sessionsSection = document.getElementById('historySessionsSection');
+  const seasonsSection = document.getElementById('historySeasonsSection');
   const subtitle = document.getElementById('historySubtitle');
 
-  if (btnGlobal && btnSessions) {
-    btnGlobal.classList.toggle('active', mode === 'global');
-    btnSessions.classList.toggle('active', mode === 'sessions');
-  }
+  if (btnGlobal) btnGlobal.classList.toggle('active', mode === 'global');
+  if (btnSessions) btnSessions.classList.toggle('active', mode === 'sessions');
+  if (btnSeasons) btnSeasons.classList.toggle('active', mode === 'seasons');
 
-  if (globalSection && sessionsSection) {
-    globalSection.style.display = (mode === 'global') ? 'block' : 'none';
-    sessionsSection.style.display = (mode === 'sessions') ? 'block' : 'none';
-  }
+  if (globalSection) globalSection.style.display = (mode === 'global') ? 'block' : 'none';
+  if (sessionsSection) sessionsSection.style.display = (mode === 'sessions') ? 'block' : 'none';
+  if (seasonsSection) seasonsSection.style.display = (mode === 'seasons') ? 'block' : 'none';
 
   if (subtitle) {
-    subtitle.textContent = (mode === 'global')
-      ? 'Chaque action est enregistrée et réversible'
-      : 'Regroupement chronologique des sessions de jeux';
+    if (mode === 'global') {
+      subtitle.textContent = 'Chaque action est enregistrée et réversible';
+    } else if (mode === 'seasons') {
+      subtitle.textContent = 'Historique et palmarès des saisons trimestrielles';
+    } else {
+      subtitle.textContent = 'Regroupement chronologique des sessions de jeux';
+    }
   }
 
   if (mode === 'sessions') {
     renderHistorySessions();
+  } else if (mode === 'seasons') {
+    renderHistorySeasons();
+    loadSeasons();
   } else {
     renderHistory();
   }
+}
+
+function toggleSeasonAccordion(seasonId) {
+  if (state.expandedSeasonIds.has(seasonId)) {
+    state.expandedSeasonIds.delete(seasonId);
+  } else {
+    state.expandedSeasonIds.add(seasonId);
+  }
+  renderHistorySeasons();
+}
+
+function renderHistorySeasons() {
+  const container = document.getElementById('historySeasonsList');
+  if (!container) return;
+
+  if (!state.seasons || state.seasons.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 30px 16px; text-align: center; color: var(--text-secondary);">
+        <p>Aucune saison enregistrée pour le moment.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  state.seasons.forEach(s => {
+    const isExpanded = state.expandedSeasonIds.has(s.id);
+    const badgeHtml = s.is_current
+      ? `<span class="season-badge current">En cours</span>`
+      : `<span class="season-badge">Terminée</span>`;
+
+    // Highlight facts
+    let highlightsHtml = '';
+    if (s.mvp) {
+      highlightsHtml += `
+        <div class="season-fact-item">
+          <span class="season-fact-label">MVP</span>
+          <span class="season-fact-value">${escapeHtml(s.mvp.player_name)} • ${s.mvp.matches_won} victoires</span>
+        </div>
+      `;
+    }
+    if (s.top_game) {
+      highlightsHtml += `
+        <div class="season-fact-item">
+          <span class="season-fact-label">Top jeu</span>
+          <span class="season-fact-value">${escapeHtml(s.top_game.name)} • ${s.top_game.matches_count} parties</span>
+        </div>
+      `;
+    }
+    if (s.win_streak) {
+      highlightsHtml += `
+        <div class="season-fact-item">
+          <span class="season-fact-label">Série</span>
+          <span class="season-fact-value">${escapeHtml(s.win_streak.player_name)} • ${s.win_streak.streak} d'affilée</span>
+        </div>
+      `;
+    }
+    if (s.rivalry) {
+      highlightsHtml += `
+        <div class="season-fact-item">
+          <span class="season-fact-label">Rivalité</span>
+          <span class="season-fact-value">${escapeHtml(s.rivalry.p1_name)} ${s.rivalry.p1_wins} vs ${escapeHtml(s.rivalry.p2_name)} ${s.rivalry.p2_wins}</span>
+        </div>
+      `;
+    }
+
+    // Accordion content if expanded
+    let accordionHtml = '';
+    if (isExpanded) {
+      // Leaderboard table for this season
+      let lbRowsHtml = '';
+      if (s.leaderboard && s.leaderboard.length > 0) {
+        s.leaderboard.forEach(entry => {
+          const color = getPlayerColor(entry.player_name);
+          const scoreDisplay = Math.round(entry.score * 1000);
+          const winsLabel = entry.matches_won > 1 ? 'wins' : 'win';
+          const gamesLabel = entry.matches_played > 1 ? 'games' : 'game';
+
+          lbRowsHtml += `
+            <div class="season-lb-row">
+              <span class="season-lb-rank">#${entry.rank}</span>
+              <div class="season-lb-player">
+                <span class="season-mini-avatar" style="background-color:${color.bg}; color:${color.text};">
+                  ${escapeHtml(entry.player_name.charAt(0).toUpperCase())}
+                </span>
+                <span class="season-lb-name">${escapeHtml(entry.player_name)}</span>
+              </div>
+              <div class="season-lb-stats">
+                <span class="season-lb-score">${scoreDisplay}</span>
+                <span class="season-lb-sub">${entry.matches_won} ${winsLabel} • ${entry.matches_played} ${gamesLabel}</span>
+              </div>
+            </div>
+          `;
+        });
+      } else {
+        lbRowsHtml = `<div style="padding: 12px; color: var(--text-muted); font-size: 0.88rem;">Aucune partie jouée lors de cette saison.</div>`;
+      }
+
+      // Games chips played in this season
+      let gamesChipsHtml = '';
+      if (s.games && s.games.length > 0) {
+        gamesChipsHtml = s.games.map(g => `
+          <div class="season-game-chip">
+            <img src="${escapeHtml(g.image_url)}" alt="" class="season-game-chip-img" onerror="this.src='/static/icons/default-game.svg'">
+            <span>${escapeHtml(g.name)}</span>
+            <span class="season-game-chip-count">${g.matches_count}</span>
+          </div>
+        `).join('');
+      }
+
+      accordionHtml = `
+        <div class="season-accordion-content">
+          <div class="season-actions-bar">
+            <button type="button" class="btn btn-sm btn-primary" onclick="viewSeasonLeaderboard('${s.id}')">
+              Voir le classement complet de cette saison
+            </button>
+          </div>
+
+          <div class="season-section-title">Palmarès de la saison</div>
+          <div class="season-lb-table">
+            ${lbRowsHtml}
+          </div>
+
+          ${gamesChipsHtml ? `
+            <div class="season-section-title" style="margin-top: 14px;">Jeux joués</div>
+            <div class="season-games-wrap">
+              ${gamesChipsHtml}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="season-card ${s.is_current ? 'is-current' : ''}">
+        <div class="season-card-header" onclick="toggleSeasonAccordion('${s.id}')">
+          <div class="season-card-main">
+            <div class="season-title-row">
+              <span class="season-title">${escapeHtml(s.name)}</span>
+              ${badgeHtml}
+            </div>
+            <div class="season-date-row">${escapeHtml(s.date_range_str)}</div>
+          </div>
+          <button type="button" class="btn-icon-subtle season-arrow-btn" aria-label="Développer">
+            <svg class="season-chevron ${isExpanded ? 'rotated' : ''}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <div class="season-metrics-bar">
+          <div class="season-metric">
+            <span class="season-metric-val">${s.matches_count}</span>
+            <span class="season-metric-lbl">Parties</span>
+          </div>
+          <div class="season-metric">
+            <span class="season-metric-val">${s.players_count}</span>
+            <span class="season-metric-lbl">Joueurs</span>
+          </div>
+          <div class="season-metric">
+            <span class="season-metric-val">${s.games_count}</span>
+            <span class="season-metric-lbl">Jeux</span>
+          </div>
+        </div>
+
+        ${highlightsHtml ? `<div class="season-highlights">${highlightsHtml}</div>` : ''}
+
+        ${accordionHtml}
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
 }
 
 function renderHistorySessions() {
