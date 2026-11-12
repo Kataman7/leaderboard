@@ -339,9 +339,9 @@ function setLeaderboardPeriod(period, seasonId = null) {
   const lbSubtitle = document.getElementById('lbSubtitle');
   if (lbSubtitle) {
     if (period === 'season') {
-      lbSubtitle.textContent = 'Saison en cours • Basé sur les adversaires battus';
+      lbSubtitle.textContent = 'Saison • Basé sur les adversaires battus';
     } else {
-      lbSubtitle.textContent = 'Général all time • Basé sur les adversaires battus';
+      lbSubtitle.textContent = 'Général • Basé sur les adversaires battus';
     }
   }
 
@@ -368,7 +368,7 @@ function updateSeasonInfoBadge() {
   }
   if (s) {
     badgeEl.style.display = 'inline-flex';
-    badgeEl.innerHTML = `<span class="period-dot">●</span> <span>${escapeHtml(s.short_name)} • ${escapeHtml(s.date_range_str)}</span>`;
+    badgeEl.innerHTML = `<span>${escapeHtml(s.short_name)} • ${escapeHtml(s.date_range_str)}</span>`;
   } else {
     badgeEl.style.display = 'none';
   }
@@ -390,7 +390,7 @@ function viewSeasonLeaderboard(seasonId) {
 
   const lbSubtitle = document.getElementById('lbSubtitle');
   if (lbSubtitle) {
-    lbSubtitle.textContent = 'Saison en cours • Basé sur les adversaires battus';
+    lbSubtitle.textContent = 'Saison • Basé sur les adversaires battus';
   }
 
   updateSeasonInfoBadge();
