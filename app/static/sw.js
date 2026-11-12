@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boardscores-v35';
+const CACHE_NAME = 'boardscores-v36';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',

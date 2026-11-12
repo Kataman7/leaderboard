@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
 
-  <link rel="stylesheet" href="/static/css/style.css?v=3.8">
+  <link rel="stylesheet" href="/static/css/style.css?v=3.9">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
       <div class="section-header">
         <div>
           <h1 class="section-title">Classement</h1>
-          <p class="section-subtitle" id="lbSubtitle">Saison • Basé sur les adversaires battus</p>
+          <p class="section-subtitle" id="lbSubtitle">Basé sur les adversaires battus</p>
         </div>
         <div class="lb-header-controls">
           <div class="lb-sort-toggle" role="group" aria-label="Trier le classement">
@@ -92,6 +92,9 @@
       <div id="leaderboardList" class="leaderboard-list">
         <!-- Rendered dynamically -->
       </div>
+
+      <!-- Season Remaining Days Footer -->
+      <div id="lbSeasonRemaining" class="lb-season-remaining" style="display: none;"></div>
     </section>
 
     <!-- ================= VIEW 2: HISTORIQUE ================= -->
@@ -539,6 +542,6 @@
     </div>
   </div>
 
-  <script src="/static/js/app.js?v=4.9"></script>
+  <script src="/static/js/app.js?v=5.0"></script>
 </body>
 </html>

@@ -270,7 +270,7 @@ async function loadSeasons() {
   try {
     const data = await apiCall('/api/seasons');
     state.seasons = data;
-    updateSeasonInfoBadge();
+    updateSeasonRemainingDays();
     if (state.currentView === 'history' && state.historyMode === 'seasons') {
       renderHistorySeasons();
     }
@@ -316,7 +316,7 @@ async function loadLeaderboard() {
   state.leaderboard = data;
   updateFilterBarState();
   renderLeaderboard();
-  updateSeasonInfoBadge();
+  updateSeasonRemainingDays();
 }
 
 function setLeaderboardPeriod(period, seasonId = null) {
@@ -336,42 +336,54 @@ function setLeaderboardPeriod(period, seasonId = null) {
     btnAll.classList.toggle('active', period === 'all');
   }
 
-  const lbSubtitle = document.getElementById('lbSubtitle');
-  if (lbSubtitle) {
-    if (period === 'season') {
-      lbSubtitle.textContent = 'Saison • Basé sur les adversaires battus';
-    } else {
-      lbSubtitle.textContent = 'Général • Basé sur les adversaires battus';
-    }
-  }
-
-  updateSeasonInfoBadge();
+  updateSeasonRemainingDays();
   loadLeaderboard();
 }
 
-function updateSeasonInfoBadge() {
-  const badgeEl = document.getElementById('lbSeasonInfoBadge');
-  if (!badgeEl) return;
+function updateSeasonRemainingDays() {
+  const container = document.getElementById('lbSeasonRemaining');
+  if (!container) return;
+
   if (state.leaderboardPeriod !== 'season') {
-    badgeEl.style.display = 'none';
-    badgeEl.innerHTML = '';
+    container.style.display = 'none';
+    container.innerHTML = '';
     return;
   }
-  let s = null;
-  if (state.seasons && state.seasons.length > 0) {
-    if (state.selectedSeasonId && state.selectedSeasonId !== 'current') {
-      s = state.seasons.find(item => item.id.toLowerCase() === state.selectedSeasonId.toLowerCase());
-    }
-    if (!s) {
-      s = state.seasons.find(item => item.is_current) || state.seasons[0];
-    }
-  }
-  if (s) {
-    badgeEl.style.display = 'inline-flex';
-    badgeEl.innerHTML = `<span>${escapeHtml(s.short_name)} • ${escapeHtml(s.date_range_str)}</span>`;
+
+  let endDate = null;
+  const currentSeason = state.seasons ? state.seasons.find(s => s.is_current) : null;
+  if (currentSeason && currentSeason.end_time) {
+    endDate = new Date(currentSeason.end_time);
   } else {
-    badgeEl.style.display = 'none';
+    const now = new Date();
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    const y = now.getFullYear();
+    const endMonths = [2, 5, 8, 11];
+    const endDays = [31, 30, 30, 31];
+    endDate = new Date(Date.UTC(y, endMonths[q - 1], endDays[q - 1], 23, 59, 59, 999));
   }
+
+  const now = new Date();
+  const diffMs = endDate.getTime() - now.getTime();
+  const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+  let label = '';
+  if (diffDays > 1) {
+    label = `${diffDays} jours restants avant la fin de la saison actuelle`;
+  } else if (diffDays === 1) {
+    label = '1 jour restant avant la fin de la saison actuelle';
+  } else {
+    label = 'Dernier jour de la saison actuelle';
+  }
+
+  container.style.display = 'flex';
+  container.innerHTML = `
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="season-clock-icon">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+    <span>${escapeHtml(label)}</span>
+  `;
 }
 
 function viewSeasonLeaderboard(seasonId) {
@@ -388,12 +400,7 @@ function viewSeasonLeaderboard(seasonId) {
     btnAll.classList.remove('active');
   }
 
-  const lbSubtitle = document.getElementById('lbSubtitle');
-  if (lbSubtitle) {
-    lbSubtitle.textContent = 'Saison • Basé sur les adversaires battus';
-  }
-
-  updateSeasonInfoBadge();
+  updateSeasonRemainingDays();
   loadLeaderboard();
 }
 

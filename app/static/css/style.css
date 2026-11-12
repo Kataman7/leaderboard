@@ -2769,6 +2769,25 @@ select:focus,
 /* ==========================================
    SEASONAL LEADERBOARD & SEASONS HISTORY
    ========================================== */
+.lb-season-remaining {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 16px 12px 24px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.season-clock-icon {
+  flex-shrink: 0;
+  stroke: var(--text-secondary);
+  opacity: 0.8;
+}
+
 .lb-season-info-badge {
   display: inline-flex;
   align-items: center;
